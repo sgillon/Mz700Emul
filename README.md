@@ -17,10 +17,13 @@ Park, Star Trek, Panic, etc.).
 
 - Windows
 - .NET 8 SDK
-- Sharp MZ-700 ROMs and (optionally) S-BASIC + cassette images in
-  `roms/`, `basic/`, `games/` next to the executable. The repo includes
-  the ones used during development; provide your own if you don't have
-  rights to those.
+- Sharp MZ-700 ROMs (`1z-013a.rom`, `mz700fon.int`) and the S-BASIC
+  cassette image (`1Z-013B.mzf`). On first run the emulator scans
+  alongside the executable and inside `roms/` / `basic/` for these
+  files and records their locations in `settings.ini` — you can move
+  them around afterwards by editing the `[Roms]` section. The repo
+  includes the files used during development; provide your own if you
+  don't have rights to those.
 
 ## Build & run
 
@@ -63,8 +66,23 @@ the window. Loading a cassette resets the emulator first, so opening
 a different program mid-execution Just Works regardless of whether the
 old or new program is BASIC or machine code.
 
-The chosen display scale is persisted in `settings.ini` next to the
-executable — a plain INI file you can edit by hand if you prefer.
+User preferences live in `settings.ini` next to the executable — a
+plain INI file you can edit by hand if you prefer:
+
+```ini
+[Display]
+Scale=2
+
+[Roms]
+Monitor=roms\1z-013a.rom
+Font=roms\mz700fon.int
+Basic=basic\1Z-013B.mzf
+```
+
+Paths are written relative to the executable when possible (so the
+install stays portable) and absolute when the file lives elsewhere.
+If a path goes stale (file moved or deleted), the next launch
+re-scans the standard locations and patches the file up.
 
 ## Keyboard
 
