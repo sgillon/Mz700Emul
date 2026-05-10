@@ -46,12 +46,18 @@ public sealed class Joystick
 
     public Z80Cpu? Cpu;
 
-    // Cycle counts at which each axis bit transitions back to high. The
-    // MZ-1X03 reading routine times the low pulse with a tight Z80 loop
-    // (INC DE; BIT n,(HL); JP Z,...) — ~28 t-states per iteration. So
-    // pulseCycles = axisValue * 28 makes BASIC's JOY(0..3) return the
-    // axis value back.
-    private const int CyclesPerCount = 28;
+    // Pulse-low duration per axis-value unit. The 555 monostable in
+    // the real MZ-1X03 has T = 1.1 * R * C ≈ 4.7 ms maximum (R≈130 kΩ,
+    // C≈0.033 µF), or ~16500 Z80 cycles at 3.5 MHz. Dividing by the
+    // 0..255 axis range gives ~64 cycles per count.
+    //
+    // 28 was an earlier guess based on the manual's hand-rolled count
+    // loop (INC DE; BIT n,(HL); JP Z,...) but games like panic.mzf
+    // sample bit-state at fixed cycle offsets after VBLK, calibrated
+    // against the real hardware pulse. With 28 cycles per count the
+    // pulse for axis=255 ends at ~7140 cycles, just before panic's
+    // second sample at ~7350 — so RIGHT/DOWN are never detected.
+    private const int CyclesPerCount = 64;
     private long _xPulseEnd0, _yPulseEnd0;
     private long _xPulseEnd1, _yPulseEnd1;
 
