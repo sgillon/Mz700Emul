@@ -19,7 +19,6 @@ public sealed class MainForm : Form
     private readonly string? _initialCassette;
     private readonly bool _autoLoadBasic;
     private readonly string? _dumpPath;
-    private readonly string _appDir;
     private bool _started;
     private bool _pendingLoadBasic;
     private string? _pendingCassette;
@@ -29,7 +28,6 @@ public sealed class MainForm : Form
         _initialCassette = cassettePath;
         _autoLoadBasic = autoLoadBasic;
         _dumpPath = dumpPath;
-        _appDir = AppContext.BaseDirectory;
 
         Text = "Sharp MZ-700 Emulator";
         KeyPreview = true;
@@ -157,9 +155,18 @@ public sealed class MainForm : Form
 
         try
         {
-            // Locate ROMs & basic directory relative to application base OR source
-            var romDir = FindDir("roms");
-            _machine.LoadRoms(romDir);
+            if (string.IsNullOrEmpty(_settings.MonitorRomFullPath) || !File.Exists(_settings.MonitorRomFullPath))
+            {
+                var configured = string.IsNullOrEmpty(_settings.MonitorRomPath)
+                    ? "(none configured)"
+                    : $"{_settings.MonitorRomPath}  →  {_settings.MonitorRomFullPath}";
+                throw new FileNotFoundException(
+                    $"Monitor ROM (1z-013a.rom) not found.\n\n" +
+                    $"Configured path: {configured}\n\n" +
+                    $"Place 1z-013a.rom under a 'roms' folder next to the executable, " +
+                    $"or set [Roms] Monitor= in {Path.Combine(AppContext.BaseDirectory, "settings.ini")}.");
+            }
+            _machine.LoadRoms(_settings.MonitorRomFullPath, _settings.FontFullPath);
             _machine.Reset();
             _machine.Cpu.PcTraceEnabled = _traceEnabled;
             _machine.Cpu.PcHistogram = _pcHist;
@@ -196,21 +203,6 @@ public sealed class MainForm : Form
             MessageBox.Show(this, "Failed to start emulator:\n" + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             Close();
         }
-    }
-
-    private string FindDir(string name)
-    {
-        // Try application base dir, then parent (source dir)
-        var candidate = Path.Combine(_appDir, name);
-        if (Directory.Exists(candidate)) return candidate;
-        var parent = Directory.GetParent(_appDir)?.FullName;
-        while (parent != null)
-        {
-            candidate = Path.Combine(parent, name);
-            if (Directory.Exists(candidate)) return candidate;
-            parent = Directory.GetParent(parent)?.FullName;
-        }
-        throw new DirectoryNotFoundException($"Could not find '{name}' directory near application.");
     }
 
     private int _bootFrames;
@@ -299,7 +291,7 @@ public sealed class MainForm : Form
         // clean stack). Replaces a previous fixed 180-frame wait.
         if (_pendingLoadBasic && MonitorReady())
         {
-            try { _machine.AutoLoadBasic(FindDir("basic")); _statusLabel.Text = "BASIC loaded."; }
+            try { _machine.AutoLoadBasic(_settings.BasicFullPath); _statusLabel.Text = "BASIC loaded."; }
             catch (Exception ex) { _statusLabel.Text = "BASIC load failed: " + ex.Message; }
             _pendingLoadBasic = false;
             _basicLoadedFrame = _bootFrames;
@@ -587,7 +579,7 @@ public sealed class MainForm : Form
     {
         try
         {
-            _machine.AutoLoadBasic(FindDir("basic"));
+            _machine.AutoLoadBasic(_settings.BasicFullPath);
             _basicLoadedFrame = _bootFrames;
             _statusLabel.Text = "BASIC loaded.";
         }

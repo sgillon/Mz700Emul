@@ -19,20 +19,49 @@ public sealed class Settings
 {
     public int DisplayScale { get; set; } = 2;
 
+    // Paths to the system files (monitor ROM, character font, BASIC
+    // cassette image). Populated automatically on first run by scanning
+    // the program directory; the user can edit settings.ini afterwards
+    // to point them somewhere else.
+    //
+    // The raw *Path strings are written to disk verbatim — kept as a
+    // path RELATIVE to the executable when the file lives at-or-below
+    // it, otherwise as an absolute path. Use the *FullPath helpers
+    // when actually opening the file.
+    public string MonitorRomPath { get; set; } = "";
+    public string FontPath { get; set; } = "";
+    public string BasicPath { get; set; } = "";
+
+    public string MonitorRomFullPath => Resolve(MonitorRomPath);
+    public string FontFullPath => Resolve(FontPath);
+    public string BasicFullPath => Resolve(BasicPath);
+
     private static string FilePath =>
         Path.Combine(AppContext.BaseDirectory, "settings.ini");
 
     public static Settings Load()
     {
         var s = new Settings();
+        bool fileExisted = File.Exists(FilePath);
         try
         {
-            if (!File.Exists(FilePath)) return s;
-            var ini = ParseIni(File.ReadAllLines(FilePath));
-            s.DisplayScale = GetInt(ini, "Display", "Scale", s.DisplayScale);
+            if (fileExisted)
+            {
+                var ini = ParseIni(File.ReadAllLines(FilePath));
+                s.DisplayScale = GetInt(ini, "Display", "Scale", s.DisplayScale);
+                s.MonitorRomPath = GetString(ini, "Roms", "Monitor", "");
+                s.FontPath = GetString(ini, "Roms", "Font", "");
+                s.BasicPath = GetString(ini, "Roms", "Basic", "");
+            }
         }
         catch { /* fall through to defaults */ }
-        return s.Sanitize();
+        s.Sanitize();
+        // Auto-detect any ROM paths that are empty or point at a missing
+        // file. On the very first run this populates all three; on later
+        // runs it self-heals if the user moved files around.
+        bool dirty = s.EnsureRomPaths();
+        if (dirty || !fileExisted) s.Save();
+        return s;
     }
 
     public void Save()
@@ -44,15 +73,118 @@ public sealed class Settings
             sb.AppendLine();
             sb.AppendLine("[Display]");
             sb.AppendLine($"Scale={DisplayScale}");
+            sb.AppendLine();
+            sb.AppendLine("[Roms]");
+            sb.AppendLine($"Monitor={MonitorRomPath}");
+            sb.AppendLine($"Font={FontPath}");
+            sb.AppendLine($"Basic={BasicPath}");
             File.WriteAllText(FilePath, sb.ToString());
         }
         catch { /* non-fatal */ }
     }
 
-    private Settings Sanitize()
+    private void Sanitize()
     {
         if (DisplayScale < 1 || DisplayScale > 3) DisplayScale = 2;
-        return this;
+    }
+
+    /// <summary>
+    /// Fills in any ROM/font/BASIC path that's empty or no longer points
+    /// at an existing file by scanning the program directory and its
+    /// <c>roms/</c> / <c>basic/</c> subdirectories (walking up the tree
+    /// so dev-time runs from <c>bin/Debug/...</c> still find files at
+    /// the source-tree root). Returns true if anything changed.
+    /// </summary>
+    private bool EnsureRomPaths()
+    {
+        bool dirty = false;
+        dirty |= EnsureOne(
+            MonitorRomFullPath, MonitorRomPath, v => MonitorRomPath = v,
+            () => FindFile("1z-013a.rom", "roms", ""));
+        dirty |= EnsureOne(
+            FontFullPath, FontPath, v => FontPath = v,
+            // Prefer the binary font over the hex text dump.
+            () => FindFile("mz700fon.int", "roms", "") ?? FindFile("font_hex.txt", "roms", ""));
+        dirty |= EnsureOne(
+            BasicFullPath, BasicPath, v => BasicPath = v,
+            // BASIC is conceptually another ROM image; scan the same
+            // places, plus the legacy basic/ folder for back-compat.
+            () => FindFile("1Z-013B.mzf", "roms", "basic", ""));
+        return dirty;
+    }
+
+    /// <summary>
+    /// Either auto-detects a missing path or normalizes an existing one
+    /// to the relative-when-possible storage form. Returns true if the
+    /// stored value changed.
+    /// </summary>
+    private static bool EnsureOne(string fullPath, string storedPath, Action<string> setStored, Func<string?> scan)
+    {
+        if (IsExistingFile(fullPath))
+        {
+            var normalized = MakeStorable(fullPath);
+            if (normalized != storedPath) { setStored(normalized); return true; }
+            return false;
+        }
+        var found = scan();
+        if (found == null) return false;
+        var storable = MakeStorable(found);
+        if (storable == storedPath) return false;
+        setStored(storable);
+        return true;
+    }
+
+    private static bool IsExistingFile(string path) =>
+        !string.IsNullOrEmpty(path) && File.Exists(path);
+
+    /// <summary>
+    /// Converts a raw stored path (relative or absolute) into an
+    /// absolute path. Relative paths are resolved against
+    /// <see cref="AppContext.BaseDirectory"/>. Empty stays empty.
+    /// </summary>
+    private static string Resolve(string storedPath)
+    {
+        if (string.IsNullOrEmpty(storedPath)) return storedPath;
+        if (Path.IsPathRooted(storedPath)) return storedPath;
+        return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, storedPath));
+    }
+
+    /// <summary>
+    /// Picks the form to write to settings.ini for an absolute path:
+    /// relative-to-base when the file lives under the executable
+    /// directory (so the INI file stays portable), absolute otherwise.
+    /// </summary>
+    private static string MakeStorable(string absolutePath)
+    {
+        var baseDir = Path.GetFullPath(AppContext.BaseDirectory).TrimEnd(Path.DirectorySeparatorChar);
+        var full = Path.GetFullPath(absolutePath);
+        var prefix = baseDir + Path.DirectorySeparatorChar;
+        if (full.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            return full.Substring(prefix.Length);
+        return full;
+    }
+
+    /// <summary>
+    /// Walks up the directory tree from <see cref="AppContext.BaseDirectory"/>
+    /// looking for <paramref name="filename"/> inside any of the listed
+    /// subdirectories at each level. Empty string in <paramref name="subdirs"/>
+    /// means "the level itself".
+    /// </summary>
+    private static string? FindFile(string filename, params string[] subdirs)
+    {
+        string? dir = AppContext.BaseDirectory;
+        while (dir != null)
+        {
+            foreach (var sub in subdirs)
+            {
+                var candidate = string.IsNullOrEmpty(sub)
+                    ? Path.Combine(dir, filename)
+                    : Path.Combine(dir, sub, filename);
+                if (File.Exists(candidate)) return candidate;
+            }
+            dir = Directory.GetParent(dir)?.FullName;
+        }
+        return null;
     }
 
     // --- minimal INI parser: [Section] headers, key=value lines, ';' or '#' comments. ---
@@ -87,6 +219,13 @@ public sealed class Settings
         if (ini.TryGetValue(section, out var s) && s.TryGetValue(key, out var v) &&
             int.TryParse(v, NumberStyles.Integer, CultureInfo.InvariantCulture, out var n))
             return n;
+        return fallback;
+    }
+
+    private static string GetString(Dictionary<string, Dictionary<string, string>> ini, string section, string key, string fallback)
+    {
+        if (ini.TryGetValue(section, out var s) && s.TryGetValue(key, out var v))
+            return v;
         return fallback;
     }
 }

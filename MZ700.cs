@@ -65,17 +65,17 @@ public sealed class MZ700
         Ppi.SpeakerGateChanged += on => Sound.Enabled = on;
     }
 
-    public void LoadRoms(string romDir)
+    public void LoadRoms(string monitorRomPath, string? fontPath)
     {
-        var romPath = Path.Combine(romDir, "1z-013a.rom");
-        Mem.LoadRom(File.ReadAllBytes(romPath));
-        // Prefer font_hex.txt if present (more portable text format), else mz700fon.int
-        var fontHex = Path.Combine(romDir, "font_hex.txt");
-        var fontBin = Path.Combine(romDir, "mz700fon.int");
-        if (File.Exists(fontBin))
-            Video.LoadFont(File.ReadAllBytes(fontBin));
-        else if (File.Exists(fontHex))
-            Video.LoadFontHex(File.ReadAllText(fontHex));
+        Mem.LoadRom(File.ReadAllBytes(monitorRomPath));
+        if (!string.IsNullOrEmpty(fontPath) && File.Exists(fontPath))
+        {
+            // Dispatch on extension: .int = binary, .txt = hex dump.
+            if (string.Equals(Path.GetExtension(fontPath), ".int", StringComparison.OrdinalIgnoreCase))
+                Video.LoadFont(File.ReadAllBytes(fontPath));
+            else
+                Video.LoadFontHex(File.ReadAllText(fontPath));
+        }
     }
 
     public void Reset()
@@ -163,11 +163,10 @@ public sealed class MZ700
         }
     }
 
-    public void AutoLoadBasic(string basicDir)
+    public void AutoLoadBasic(string basicPath)
     {
-        var path = Path.Combine(basicDir, "1Z-013B.mzf");
-        if (!File.Exists(path)) throw new FileNotFoundException("BASIC cassette image not found", path);
-        var img = Cassette.Parse(File.ReadAllBytes(path));
+        if (!File.Exists(basicPath)) throw new FileNotFoundException("BASIC cassette image not found", basicPath);
+        var img = Cassette.Parse(File.ReadAllBytes(basicPath));
         // Direct-inject: write the full image to its load address and jump to
         // its exec entry. This bypasses the monitor's LOAD dispatch, which is
         // unreliable in our emulation (keyboard-scan ISR doesn't run because
