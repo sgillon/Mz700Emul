@@ -216,7 +216,12 @@ public sealed class Keyboard
                     if (Memory != null) Memory.Ram[0x1170] = 0x00;
                 }
                 _current = null;
-                _typeTimer = 4;
+                // Standard inter-key gap is 4 frames. After Enter (matrix
+                // (0,0)) BASIC may be tokenising and inserting the line —
+                // 4 frames isn't long enough and the next press gets
+                // dropped. Use 30 frames (~0.5 s) so BASIC is back at
+                // its READY/input loop before we send the next line.
+                _typeTimer = (p.Row == 0 && p.Col == 0) ? 30 : 4;
             }
             return;
         }
@@ -226,14 +231,16 @@ public sealed class Keyboard
         if (_typeQueue.Count > 0)
         {
             var p = _typeQueue.Dequeue();
-            if (p.MzShift)
-            {
-                SetMatrix(8, 0, true);
-                if (Memory != null) Memory.Ram[0x1170] = 0x01;
-            }
+            // Always set the shift bit + $1170 explicitly (not just when
+            // shifted). Otherwise a previous shifted-then-unshifted
+            // sequence can leave stale state. Hold for 12 frames (~200ms)
+            // so BASIC's matrix scan has comfortable margin to see both
+            // the shift bit and the key bit as concurrent.
+            SetMatrix(8, 0, p.MzShift);
+            if (Memory != null) Memory.Ram[0x1170] = (byte)(p.MzShift ? 0x01 : 0x00);
             SetMatrix(p.Row, p.Col, true);
             _current = p;
-            _typeTimer = 4;
+            _typeTimer = 12;
         }
     }
 }

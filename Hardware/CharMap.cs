@@ -75,7 +75,7 @@ public static class CharMap
         // the MZ glyph at that position (e.g. UK Shift+3='£' → MZ '#').
         ['£'] = new(5, 5, true),  // UK Shift+3 → MZ Shift+3 position ('#')
         ['^'] = new(5, 2, true),  // UK Shift+6 → MZ Shift+6 position ('&')
-        ['*'] = new(5, 0, true),  // UK Shift+8 → MZ Shift+8 position ('(')
+        ['*'] = new(5, 0, true),  // UK Shift+8 → MZ Shift+8 position
         ['<'] = new(6, 1, true),  // UK Shift+, → MZ Shift+, position
         ['>'] = new(6, 0, true),  // UK Shift+. → MZ Shift+. position
 

@@ -17,6 +17,13 @@
     <PackageReference Include="NAudio" Version="2.2.1" />
   </ItemGroup>
 
+  <!-- Sibling tool projects under tools/ are built separately; exclude
+       their sources from this project to avoid double-compile errors. -->
+  <ItemGroup>
+    <Compile Remove="tools/**/*.cs" />
+    <None Remove="tools/**/*" />
+  </ItemGroup>
+
   <ItemGroup>
     <None Update="roms\1z-013a.rom">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

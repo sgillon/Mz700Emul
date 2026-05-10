@@ -63,8 +63,16 @@ regardless of host speed.
 |---|---|
 | Load cassette… | Ctrl+O |
 | Load BASIC | Ctrl+B |
+| Load BASIC source… | Ctrl+Shift+B |
 | Reset | Ctrl+R |
 | Display 1× / 2× / 3× | Ctrl+1 / Ctrl+2 / Ctrl+3 |
+
+"Load BASIC source…" reads a plain-text `.bas` file and types each
+non-blank, non-comment line into the running BASIC interpreter. Lines
+starting with `;` or `'` are stripped on the host side. If BASIC
+isn't loaded yet the emulator resets, auto-loads BASIC, then types
+the source once the READY prompt is up. End the file with `RUN` to
+auto-start the program. See `games/joytest.bas` for an example.
 
 You can also drag and drop an `.mzf` (or a `.zip` containing one) onto
 the window. Loading a cassette resets the emulator first, so opening

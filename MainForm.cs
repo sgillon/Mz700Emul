@@ -14,6 +14,7 @@ public sealed class MainForm : Form
     private readonly System.Windows.Forms.Timer _timer = new();
     private readonly StatusStrip _status = new();
     private readonly ToolStripStatusLabel _statusLabel = new();
+    private readonly ToolStripStatusLabel _joyStatus = new() { Spring = false };
     private readonly PictureBox _display = new();
     private readonly Settings _settings = Settings.Load();
     private readonly ToolStripMenuItem[] _scaleMenuItems = new ToolStripMenuItem[3];
@@ -23,6 +24,7 @@ public sealed class MainForm : Form
     private bool _started;
     private bool _pendingLoadBasic;
     private string? _pendingCassette;
+    private string? _pendingBasicSource;
 
     public MainForm(string? cassettePath, bool autoLoadBasic, string? dumpPath = null)
     {
@@ -51,8 +53,11 @@ public sealed class MainForm : Form
         // form (which has KeyPreview = true).
         _display.TabStop = false;
 
+        _statusLabel.Spring = true;
         _status.Items.Add(_statusLabel);
+        _status.Items.Add(_joyStatus);
         _statusLabel.Text = "Ready.";
+        _joyStatus.Text = "Joy: --";
         // Docking order matters: the Fill control must be added LAST so the
         // menu (top) and status strip (bottom) claim their space first.
         Controls.Add(_status);
@@ -98,6 +103,7 @@ public sealed class MainForm : Form
         var file = new ToolStripMenuItem("&File");
         file.DropDownItems.Add(new ToolStripMenuItem("&Load cassette...", null, (_, _) => BrowseAndLoad()) { ShortcutKeys = Keys.Control | Keys.O });
         file.DropDownItems.Add(new ToolStripMenuItem("Load &BASIC", null, (_, _) => LoadBasic()) { ShortcutKeys = Keys.Control | Keys.B });
+        file.DropDownItems.Add(new ToolStripMenuItem("Load BASIC &source...", null, (_, _) => BrowseAndLoadBasicSource()) { ShortcutKeys = Keys.Control | Keys.Shift | Keys.B });
         file.DropDownItems.Add(new ToolStripSeparator());
         file.DropDownItems.Add(new ToolStripMenuItem("&Reset", null, (_, _) => ResetMachine()) { ShortcutKeys = Keys.Control | Keys.R });
         file.DropDownItems.Add(new ToolStripSeparator());
@@ -251,6 +257,19 @@ public sealed class MainForm : Form
         _machine.RunFrame();
         _bootFrames++;
 
+        // Refresh joystick indicator every ~10 frames (~6 Hz) — enough
+        // to confirm at a glance whether XInput is seeing a controller.
+        if (_bootFrames % 10 == 0)
+        {
+            var s0 = _machine.Joystick.Sticks[0];
+            var s1 = _machine.Joystick.Sticks[1];
+            string Fmt(Hardware.Joystick.StickState s, int n) =>
+                s.Active
+                    ? $"{n}[X{s.AxisX:D3} Y{s.AxisY:D3}{(s.Sw1 ? " A" : "")}{(s.Sw2 ? " B" : "")}]"
+                    : $"{n}-";
+            _joyStatus.Text = $"Joy: {Fmt(s0, 1)} {Fmt(s1, 2)}";
+        }
+
         if (++_soundDiagDownsample >= 30)
         {
             _soundDiagDownsample = 0;
@@ -357,6 +376,22 @@ public sealed class MainForm : Form
                 _statusLabel.Text = "Cassette load failed: " + ex.Message;
             }
             _pendingCassette = null;
+        }
+
+        // BASIC source: identical readiness gate as a BASIC cassette —
+        // wait for BASIC's READY prompt then auto-type the file in.
+        if (_pendingBasicSource != null && _basicLoadedFrame >= 0 && _bootFrames - _basicLoadedFrame >= 60)
+        {
+            try
+            {
+                TypeBasicSource(_pendingBasicSource);
+                _statusLabel.Text = $"Typing {Path.GetFileName(_pendingBasicSource)}…";
+            }
+            catch (Exception ex)
+            {
+                _statusLabel.Text = "BASIC source load failed: " + ex.Message;
+            }
+            _pendingBasicSource = null;
         }
 
         _display.Invalidate();
@@ -592,6 +627,57 @@ public sealed class MainForm : Form
         catch (Exception ex)
         {
             MessageBox.Show(this, "BASIC load failed:\n" + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void BrowseAndLoadBasicSource()
+    {
+        using var dlg = new OpenFileDialog
+        {
+            Filter = "BASIC source (*.bas;*.txt)|*.bas;*.txt|All files|*.*",
+            Title = "Load BASIC source"
+        };
+        if (dlg.ShowDialog(this) == DialogResult.OK) LoadBasicSourceFile(dlg.FileName);
+    }
+
+    /// <summary>
+    /// Type a BASIC text source into the running interpreter. Each non-
+    /// blank, non-comment line is sent through the keyboard auto-typer
+    /// followed by CR. If BASIC isn't currently loaded, the machine is
+    /// reset and BASIC + this source are queued for after monitor boot.
+    /// Comment lines start with <c>;</c> or <c>'</c> and are stripped on
+    /// the host side so they don't waste cycles inside BASIC.
+    /// </summary>
+    private void LoadBasicSourceFile(string path)
+    {
+        try
+        {
+            if (_basicLoadedFrame < 0)
+            {
+                ResetMachine();
+                _pendingLoadBasic = true;
+                _pendingBasicSource = path;
+                _statusLabel.Text = $"Loading BASIC + {Path.GetFileName(path)}…";
+                return;
+            }
+            TypeBasicSource(path);
+            _statusLabel.Text = $"Typing {Path.GetFileName(path)}…";
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, "Failed to load BASIC source:\n" + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void TypeBasicSource(string path)
+    {
+        foreach (var raw in File.ReadAllLines(path))
+        {
+            var line = raw.TrimEnd();
+            if (line.Length == 0) continue;
+            var trimmed = line.TrimStart();
+            if (trimmed.StartsWith(';') || trimmed.StartsWith('\'')) continue;
+            _machine.Keyboard.TypeString(line + "\r");
         }
     }
 
