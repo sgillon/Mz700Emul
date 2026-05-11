@@ -7,6 +7,8 @@ A Sharp MZ-700 emulator written in C# / .NET 8 (WinForms). The aims of this emul
 
 This means that the goal is for the emulator to work 'well enough' without necessarily worrying about accurately reproducing how the actual MZ-700 hardware works.
 
+IMPORTANT NOTE - The emulator code is *entirely* AI generated. Although I have some development experience, how CPUs etc work is outside my skillset so what is here is a result of several days of me working with Claude to produce the features and refinements I need for my use case. I chose to use C# as it is a language I know, so I can use how the project has been put together to educate myself on what it takes to create an emulator.
+
 ## Status
 
 Functional. Boots the 1Z-013A monitor, runs S-BASIC (1Z-013B), plays
