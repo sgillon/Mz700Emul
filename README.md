@@ -71,6 +71,7 @@ regardless of host speed.
 | Load BASIC source… | Ctrl+Shift+B |
 | Reset | Ctrl+R |
 | Display 1× / 2× / 3× | Ctrl+1 / Ctrl+2 / Ctrl+3 |
+| Debugger… | Ctrl+D |
 
 "Load BASIC source…" reads a plain-text `.bas` file and types each
 non-blank, non-comment line into the running BASIC interpreter. Lines
@@ -101,6 +102,24 @@ Paths are written relative to the executable when possible (so the
 install stays portable) and absolute when the file lives elsewhere.
 If a path goes stale (file moved or deleted), the next launch
 re-scans the standard locations and patches the file up.
+
+## Debugger
+
+`Debug > Debugger…` (Ctrl+D) opens a debugger window. It currently
+provides CPU execution control and inspection:
+
+- **Pause / Resume** (F5), **Step** one instruction (F10), **Step
+  Frame** (F11), and **Reset**. Pausing freezes the CPU between
+  instructions while the screen keeps refreshing — nothing blocks, so
+  the emulator and debugger stay responsive.
+- A live **Z80 register view**: `PC`, `SP`, the main and alternate
+  register pairs, `IX`/`IY`, `I`/`R`/`IM`, the interrupt flip-flops and
+  halt state, decoded flags, and the total cycle count.
+- An address-based **breakpoint manager**: enter a hex address to add a
+  breakpoint; execution stops with `PC` parked on that instruction.
+
+A disassembly view and BASIC-aware panes (program listing, current
+line, variable table) are planned next.
 
 ## Keyboard
 
@@ -137,6 +156,7 @@ Hardware/        8255 PPI, 8253 PIT, memory map, keyboard (CharMap +
                  SpecialKeyMap), video, sound, cassette + zip loader
 MainForm         Window, menu, timer-driven RunFrame loop, CLI auto-load
 MZ700            Top-level "machine" that wires CPU + I/O + ROMs
+DebuggerForm.cs  Debugger window (execution control, registers, breakpoints)
 Settings.cs      INI-backed user preferences (settings.ini)
 docs/            Sharp service & owners' manuals (reference)
 roms/            Monitor ROM (1Z-013A) + character generator
