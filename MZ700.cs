@@ -37,6 +37,13 @@ public sealed class MZ700
     // real MZ-700 plays at ~13 sec with this rate.
     private const int CyclesPerTempoToggle = 35469;
 
+    // --- Debugger control ---
+    // When Paused, RunFrame renders the screen but does not advance the
+    // CPU. _stepFrameRequested is a one-shot that lets a single frame
+    // run while still Paused (the "step frame" debugger action).
+    public bool Paused;
+    private bool _stepFrameRequested;
+
     public MZ700()
     {
         Cpu.Mem = Mem;
@@ -105,9 +112,22 @@ public sealed class MZ700
     /// <summary>
     /// Execute a single video frame. Advances CPU for ~1/60s worth of cycles,
     /// tracking PIT counter ticks and VBLANK signalling.
+    ///
+    /// When <see cref="Paused"/> (debugger), the CPU is not advanced — the
+    /// screen is still re-rendered so the display and debugger panes stay
+    /// live. A one-shot "step frame" overrides the pause for one frame, and
+    /// a breakpoint hit mid-frame stops the frame early and sets Paused.
     /// </summary>
     public void RunFrame()
     {
+        if (Paused && !_stepFrameRequested)
+        {
+            Video.Render(Mem.Vram, Mem.Aram);
+            return;
+        }
+        bool stepFrame = _stepFrameRequested;
+        _stepFrameRequested = false;
+
         // Visible portion ~192 lines + blanking -> we'll pulse VBLANK at frame end
         Ppi.SetVBlank(false);
         // VBLK falling edge triggers the joystick 555 monostables.
@@ -119,21 +139,33 @@ public sealed class MZ700
         // Type-ahead (auto-typed commands) tick
         Keyboard.TickAutoType();
 
+        Cpu.BreakpointTripped = false;
+        bool tripped = false;
+
         while (cyclesThisFrame < cyclesToVBlank)
         {
             int cyc = Cpu.Step();
+            if (Cpu.BreakpointTripped) { tripped = true; break; }
             cyclesThisFrame += cyc;
             AccumulatePit(cyc);
         }
 
-        Ppi.SetVBlank(true);
-
-        while (cyclesThisFrame < CyclesPerFrame)
+        if (!tripped)
         {
-            int cyc = Cpu.Step();
-            cyclesThisFrame += cyc;
-            AccumulatePit(cyc);
+            Ppi.SetVBlank(true);
+
+            while (cyclesThisFrame < CyclesPerFrame)
+            {
+                int cyc = Cpu.Step();
+                if (Cpu.BreakpointTripped) { tripped = true; break; }
+                cyclesThisFrame += cyc;
+                AccumulatePit(cyc);
+            }
         }
+
+        // A breakpoint hit (or a one-shot step-frame) leaves the machine
+        // paused so the debugger can inspect state.
+        if (tripped || stepFrame) Paused = true;
 
         // Render to Video.Frame
         Video.Render(Mem.Vram, Mem.Aram);
@@ -142,6 +174,47 @@ public sealed class MZ700
         // (e.g. after a control word but before LSB/MSB are reloaded) the
         // speaker should be silent regardless of the PC3 gate state.
         Sound.SetReload(Pit.Counters[0].Running ? Pit.Counters[0].Reload : 0);
+    }
+
+    // --- Debugger control surface ---------------------------------------
+
+    /// <summary>Freeze the CPU; RunFrame keeps rendering but won't step.</summary>
+    public void Pause() => Paused = true;
+
+    /// <summary>
+    /// Un-freeze the CPU. Arms a one-shot breakpoint bypass so execution
+    /// can move off an instruction the debugger is parked on.
+    /// </summary>
+    public void Resume()
+    {
+        Cpu.IgnoreBreakpointOnce = true;
+        Cpu.BreakpointTripped = false;
+        Paused = false;
+    }
+
+    /// <summary>
+    /// Execute exactly one Z80 instruction, with the PIT/tempo bookkeeping
+    /// RunFrame's loop normally does so timing devices stay coherent.
+    /// Leaves the machine paused.
+    /// </summary>
+    public void StepInstruction()
+    {
+        Cpu.IgnoreBreakpointOnce = true;
+        Cpu.BreakpointTripped = false;
+        int cyc = Cpu.Step();
+        AccumulatePit(cyc);
+        Paused = true;
+    }
+
+    /// <summary>
+    /// Run one full frame's worth of cycles, then re-pause. Honoured by
+    /// the next RunFrame call even though the machine is paused.
+    /// </summary>
+    public void StepFrame()
+    {
+        Cpu.IgnoreBreakpointOnce = true;
+        Cpu.BreakpointTripped = false;
+        _stepFrameRequested = true;
     }
 
     private void AccumulatePit(int cpuCycles)

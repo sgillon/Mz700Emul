@@ -101,6 +101,8 @@ public sealed partial class Z80Cpu
         WZ = 0;
         _intRequested = false;
         TotalCycles = 0;
+        BreakpointTripped = false;
+        IgnoreBreakpointOnce = false;
     }
 
     public void RequestInterrupt() => _intRequested = true;
@@ -452,6 +454,18 @@ public sealed partial class Z80Cpu
     // see hot PC ranges during BASIC MUSIC playback.
     public int[]? PcHistogram;
 
+    // --- Debugger support ---
+    // One slot per 64K address; true = breakpoint armed. Checked once
+    // per Step() before the instruction at PC executes, leaving PC
+    // parked on the breakpointed instruction when one trips.
+    public readonly bool[] Breakpoints = new bool[0x10000];
+    // Set true by Step() when it declined to execute because PC was on
+    // a breakpoint; MZ700.RunFrame watches this to stop the frame early.
+    public bool BreakpointTripped;
+    // When true, the next Step() ignores a breakpoint at PC exactly once,
+    // letting the debugger resume/step off the instruction it's parked on.
+    public bool IgnoreBreakpointOnce;
+
     public int Step()
     {
         int intCycles = HandleInterruptIfPending();
@@ -470,6 +484,16 @@ public sealed partial class Z80Cpu
             TotalCycles += 4;
             return 4;
         }
+
+        // Debugger breakpoint: decline to execute the instruction at a
+        // breakpointed PC, leaving PC parked on it for inspection. The
+        // caller sees BreakpointTripped and stops the frame.
+        if (Breakpoints[PC] && !IgnoreBreakpointOnce)
+        {
+            BreakpointTripped = true;
+            return 0;
+        }
+        IgnoreBreakpointOnce = false;
 
         if (PcTraceEnabled && !PcTraceFrozen)
         {

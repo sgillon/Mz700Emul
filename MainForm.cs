@@ -25,6 +25,7 @@ public sealed class MainForm : Form
     private bool _pendingLoadBasic;
     private string? _pendingCassette;
     private string? _pendingBasicSource;
+    private DebuggerForm? _debugger;
 
     public MainForm(string? cassettePath, bool autoLoadBasic, string? dumpPath = null)
     {
@@ -94,7 +95,7 @@ public sealed class MainForm : Form
             Focus();
             Start();
         };
-        FormClosing += (_, _) => { _timer.Stop(); _machine.Sound.Dispose(); };
+        FormClosing += (_, _) => { _timer.Stop(); _debugger?.Dispose(); _machine.Sound.Dispose(); };
     }
 
     private void BuildMenu()
@@ -123,6 +124,10 @@ public sealed class MainForm : Form
             view.DropDownItems.Add(item);
         }
         menu.Items.Add(view);
+
+        var debug = new ToolStripMenuItem("&Debug");
+        debug.DropDownItems.Add(new ToolStripMenuItem("&Debugger…", null, (_, _) => OpenDebugger()) { ShortcutKeys = Keys.Control | Keys.D });
+        menu.Items.Add(debug);
 
         var help = new ToolStripMenuItem("&Help");
         help.DropDownItems.Add(new ToolStripMenuItem("&About", null, (_, _) =>
@@ -256,6 +261,7 @@ public sealed class MainForm : Form
         _joystickInput.Poll();
         _machine.RunFrame();
         _bootFrames++;
+        _debugger?.RefreshIfVisible();
 
         // Refresh joystick indicator every ~10 frames (~6 Hz) — enough
         // to confirm at a glance whether XInput is seeing a controller.
@@ -688,6 +694,19 @@ public sealed class MainForm : Form
         _monitorReady = false;
         _basicLoadedFrame = -1;
         _statusLabel.Text = "Reset.";
+    }
+
+    private void OpenDebugger()
+    {
+        if (_debugger == null || _debugger.IsDisposed)
+        {
+            _debugger = new DebuggerForm(_machine, ResetMachine);
+            // First open: park it just to the right of the main window.
+            _debugger.Location = new Point(Bounds.Right + 8, Bounds.Top);
+        }
+        _debugger.Owner = this;
+        _debugger.Show();
+        _debugger.BringToFront();
     }
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
