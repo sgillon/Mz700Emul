@@ -46,18 +46,31 @@ public sealed class Joystick
 
     public Z80Cpu? Cpu;
 
-    // Pulse-low duration per axis-value unit. The 555 monostable in
-    // the real MZ-1X03 has T = 1.1 * R * C ≈ 4.7 ms maximum (R≈130 kΩ,
-    // C≈0.033 µF), or ~16500 Z80 cycles at 3.5 MHz. Dividing by the
-    // 0..255 axis range gives ~64 cycles per count.
+    // Pulse-low duration per axis-value unit. Calibrated against the
+    // joystick-read routine in panic.mzf ($2220), which is the most
+    // demanding consumer we have a full disassembly of. That routine,
+    // after the VBLK falling edge, samples each axis bit at two fixed
+    // cycle offsets — ~1490 and ~7390 Z80 cycles — and counts how many
+    // samples caught the pulse still low (0 = axis low/left-up, 1 =
+    // centre, 2 = axis high/right-down).
     //
-    // 28 was an earlier guess based on the manual's hand-rolled count
-    // loop (INC DE; BIT n,(HL); JP Z,...) but games like panic.mzf
-    // sample bit-state at fixed cycle offsets after VBLK, calibrated
-    // against the real hardware pulse. With 28 cycles per count the
-    // pulse for axis=255 ends at ~7140 cycles, just before panic's
-    // second sample at ~7350 — so RIGHT/DOWN are never detected.
-    private const int CyclesPerCount = 64;
+    // For a centred axis (128) to read as "1" the pulse must end
+    // between the two samples, and for a full-deflection axis (255) to
+    // read as "2" it must still be low past 7390 cycles:
+    //   128 * C  in (1490, 7390)  ->  C in (11.6, 57.7)
+    //   255 * C  >   7390         ->  C >  29.0
+    // The lower the value within that window, the more symmetric the
+    // left/centre/right split, and the closer the BASIC JOY() function
+    // (whose count loop is ~33 cycles/iteration) tracks 0..255. 33
+    // sits just above panic's hard floor: full-right gives 255*33 =
+    // 8415 cycles (1025-cycle / ~31-unit margin past the 7390 sample),
+    // while centre gives 4224 — comfortably mid-window.
+    //
+    // Earlier guesses: 28 (too low — 255*28 = 7140 missed panic's
+    // second sample, RIGHT/DOWN never detected) and 64 (too high — a
+    // centred 128*64 = 8192 already passed the second sample, so centre
+    // read as full RIGHT/DOWN).
+    private const int CyclesPerCount = 33;
     private long _xPulseEnd0, _yPulseEnd0;
     private long _xPulseEnd1, _yPulseEnd1;
 
