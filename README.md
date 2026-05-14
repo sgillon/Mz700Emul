@@ -148,8 +148,8 @@ games/           Sample MZF cassette images
 
 - MZ-only glyphs (graphics blocks, kana) aren't reachable from a PC
   keyboard in the current char-driven model — by design.
-- Sound reproduction isn't quite right. It works well enough to play most games, but some times sounds are missing and I'm not confident about the timings
-- Some issues in BASIC. For example, in the Solo Software's version of Star Trek, there seems to be an issue parsing variables for things like the long range and galactic maps
+- Sound reproduction isn't quite right. It works well enough to play most games, but sometimes sounds are missing and I'm not confident about the timings
+- Some issues in BASIC. For example, in Solo Software's version of Star Trek, there seems to be an issue parsing variables for things like the long range and galactic maps
 
 ## Hardware notes
 
