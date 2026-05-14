@@ -42,7 +42,7 @@ dotnet run
 Or once built:
 
 ```
-.\bin\Debug\net8.0-windows\MZ700Emul.exe [--basic] [path\to\cassette.mzf]
+.\[Working dir]\MZ700Emul.exe [--basic] [path\to\cassette.mzf]
 ```
 
 The launcher waits for the monitor to display its `MONITOR 1Z*` prompt
