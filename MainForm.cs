@@ -26,6 +26,7 @@ public sealed class MainForm : Form
     private string? _pendingCassette;
     private string? _pendingBasicSource;
     private DebuggerForm? _debugger;
+    private MemoryViewerForm? _memViewer;
 
     public MainForm(string? cassettePath, bool autoLoadBasic, string? dumpPath = null)
     {
@@ -95,7 +96,7 @@ public sealed class MainForm : Form
             Focus();
             Start();
         };
-        FormClosing += (_, _) => { _timer.Stop(); _debugger?.Dispose(); _machine.Sound.Dispose(); };
+        FormClosing += (_, _) => { _timer.Stop(); _debugger?.Dispose(); _memViewer?.Dispose(); _machine.Sound.Dispose(); };
     }
 
     private void BuildMenu()
@@ -127,6 +128,7 @@ public sealed class MainForm : Form
 
         var debug = new ToolStripMenuItem("&Debug");
         debug.DropDownItems.Add(new ToolStripMenuItem("&Debugger…", null, (_, _) => OpenDebugger()) { ShortcutKeys = Keys.Control | Keys.D });
+        debug.DropDownItems.Add(new ToolStripMenuItem("&Memory Viewer…", null, (_, _) => OpenMemoryViewer()) { ShortcutKeys = Keys.Control | Keys.M });
         menu.Items.Add(debug);
 
         var help = new ToolStripMenuItem("&Help");
@@ -262,6 +264,7 @@ public sealed class MainForm : Form
         _machine.RunFrame();
         _bootFrames++;
         _debugger?.RefreshIfVisible();
+        _memViewer?.RefreshIfVisible();
 
         // Refresh joystick indicator every ~10 frames (~6 Hz) — enough
         // to confirm at a glance whether XInput is seeing a controller.
@@ -707,6 +710,20 @@ public sealed class MainForm : Form
         _debugger.Owner = this;
         _debugger.Show();
         _debugger.BringToFront();
+    }
+
+    private void OpenMemoryViewer()
+    {
+        if (_memViewer == null || _memViewer.IsDisposed)
+        {
+            _memViewer = new MemoryViewerForm(_machine);
+            // First open: park it below the main window so it doesn't fight
+            // the debugger for the right-side slot.
+            _memViewer.Location = new Point(Bounds.Left, Bounds.Bottom + 8);
+        }
+        _memViewer.Owner = this;
+        _memViewer.Show();
+        _memViewer.BringToFront();
     }
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]

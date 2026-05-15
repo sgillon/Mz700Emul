@@ -33,7 +33,7 @@ public sealed class DebuggerForm : Form
     private readonly Button _btnStep = new();
     private readonly Button _btnStepFrame = new();
     private readonly Button _btnReset = new();
-    private readonly Label _regLabel = new();
+    private readonly SmoothLabel _regLabel = new();
 
     private readonly TextBox _gotoAddr = new();
     private readonly Button _btnGoto = new();
@@ -44,7 +44,7 @@ public sealed class DebuggerForm : Form
     private readonly Button _bpAdd = new();
     private readonly Button _bpRemove = new();
     private readonly ListBox _bpList = new();
-    private readonly Label _statusLabel = new();
+    private readonly SmoothLabel _statusLabel = new();
 
     private readonly Font _mono;
 
@@ -353,8 +353,12 @@ public sealed class DebuggerForm : Form
         string marker = isBp ? "*" : (isPC ? ">" : " ");
         string txt = $" {marker} {line.Text}";
 
-        using (var fg = new SolidBrush(fore))
-            e.Graphics.DrawString(txt, _disasmList.Font, fg, e.Bounds.Left + 2, e.Bounds.Top + 1);
+        // TextRenderer (GDI) is markedly faster and less flickery than
+        // Graphics.DrawString (GDI+) for owner-drawn items refreshing at
+        // 60 Hz — particularly with a monospace font.
+        TextRenderer.DrawText(e.Graphics, txt, _disasmList.Font,
+            new Point(e.Bounds.Left + 2, e.Bounds.Top + 1), fore,
+            TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
     }
 
     private void OnDisasmMouseWheel(object? sender, MouseEventArgs e)
@@ -613,21 +617,5 @@ public sealed class DebuggerForm : Form
     private static void SetTextIfChanged(Control c, string text)
     {
         if (c.Text != text) c.Text = text;
-    }
-
-    /// <summary>
-    /// ListBox subclass with DoubleBuffered enabled. Owner-drawn ListBoxes
-    /// default to single-buffered painting; under per-frame Invalidate()
-    /// that's visibly flickery.
-    /// </summary>
-    private sealed class SmoothListBox : ListBox
-    {
-        public SmoothListBox() { DoubleBuffered = true; }
-    }
-
-    /// <summary>TableLayoutPanel with double-buffering on.</summary>
-    private sealed class SmoothTableLayoutPanel : TableLayoutPanel
-    {
-        public SmoothTableLayoutPanel() { DoubleBuffered = true; }
     }
 }
