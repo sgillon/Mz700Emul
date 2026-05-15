@@ -21,10 +21,9 @@ per-key config needed). Cassette images load via menu, drag-drop, or
 the command line — the MZF type byte is inspected so BASIC programs
 auto-load BASIC and `RUN`, and machine-code programs jump to their
 entry directly. `.zip` archives containing a cassette are accepted
-transparently. Tested against several commercial titles (Nightmare
-Park, Star Trek, Space Panic, etc.).
-
-Need to expand to include mention of joystick support via MZ-1X03 emulation
+transparently. MZ-1X03 joysticks are emulated and driven from any
+Windows-recognised game controller. Tested against several commercial
+titles (Nightmare Park, Star Trek, Space Panic, etc.).
 
 
 ## Requirements
@@ -109,8 +108,8 @@ re-scans the standard locations and patches the file up.
 
 ## Debugger
 
-`Debug > Debugger…` (Ctrl+D) opens a debugger window. It currently
-provides CPU execution control and inspection:
+`Debug > Debugger…` (Ctrl+D) opens a debugger window. It provides CPU
+execution control and inspection:
 
 - **Pause / Resume** (F5), **Step** one instruction (F10), **Step
   Frame** (F11), and **Reset**. Pausing freezes the CPU between
@@ -119,11 +118,19 @@ provides CPU execution control and inspection:
 - A live **Z80 register view**: `PC`, `SP`, the main and alternate
   register pairs, `IX`/`IY`, `I`/`R`/`IM`, the interrupt flip-flops and
   halt state, decoded flags, and the total cycle count.
+- A **disassembly pane** with PC highlighting (yellow, `>` marker) and
+  breakpoint highlighting (pink, `*` marker). **Double-click a line to
+  toggle a breakpoint** at that address. *Goto $* jumps anywhere in the
+  64K space; *Follow PC* (on by default) keeps the current instruction
+  on screen while paused. Up/Down, PgUp/PgDn and the mouse wheel
+  navigate; Home re-centres on PC. Manual scroll switches Follow PC
+  off.
 - An address-based **breakpoint manager**: enter a hex address to add a
-  breakpoint; execution stops with `PC` parked on that instruction.
+  breakpoint, or just use the double-click in the disassembly pane.
+  Execution stops with `PC` parked on the breakpointed instruction.
 
-A disassembly view and BASIC-aware panes (program listing, current
-line, variable table) are planned next.
+BASIC-aware panes (program listing, current line, variable table) are
+planned next.
 
 ## Keyboard
 
@@ -152,15 +159,48 @@ The translation table lives in `Hardware/CharMap.cs` (printables) and
 blocks, kana) aren't reachable in this scheme — that's an intentional
 trade-off for not having to configure anything.
 
+## Joystick
+
+The emulator emulates the **Sharp MZ-1X03** dual-joystick interface,
+fed from any Windows-recognised game controller. Up to two controllers
+are supported (slot 0 → MZ stick 1, slot 1 → MZ stick 2).
+
+The input bridge uses the WinMM `joyGetPosEx` API rather than XInput,
+so non-XInput pads (older PC gamepads, USB SNES adapters, bare PS3/PS4
+pads, etc.) are picked up too. When a controller is connected the
+status bar shows e.g. `Joy: 1[X128 Y128]`; without a controller, $E008
+returns "idle / not pressed" so games like `panic.mzf` boot normally.
+
+- Stick axes drive the 555-monostable pulses on $E008 bits 1-4 during
+  the visible portion of the frame. Pulse-low duration is calibrated
+  against `panic.mzf`'s read routine — full-deflection reads as 0/255,
+  centred reads as 128.
+- The POV hat (D-pad on most pads) overrides the analog axes when
+  held, giving clean 0 / 128 / 255 quantisation for BASIC `JOY()`-style
+  reads.
+- Buttons 1 and 2 map to SW1 and SW2 on each stick (active-low during
+  vertical blanking).
+
+Two test programs live in `games/`:
+- `games/joytest.bas` — BASIC test that draws a `+` on screen tracking
+  stick 1.
+- `games/joytest.mzf` — same as a machine-code cassette.
+
+The relevant code: `Hardware/Joystick.cs` (MZ-side multiplexing on
+$E008), `Hardware/JoystickInput.cs` (WinMM bridge).
+
 ## Project layout
 
 ```
-Z80/             Z80 CPU core (main, ED, CB, IX/IY prefixes)
+Z80/             Z80 CPU core (main, ED, CB, IX/IY prefixes) and the
+                 standalone disassembler used by the debugger window
 Hardware/        8255 PPI, 8253 PIT, memory map, keyboard (CharMap +
-                 SpecialKeyMap), video, sound, cassette + zip loader
+                 SpecialKeyMap), video, sound, cassette + zip loader,
+                 joystick (MZ-1X03 + WinMM bridge)
 MainForm         Window, menu, timer-driven RunFrame loop, CLI auto-load
 MZ700            Top-level "machine" that wires CPU + I/O + ROMs
-DebuggerForm.cs  Debugger window (execution control, registers, breakpoints)
+DebuggerForm.cs  Debugger window (execution control, registers,
+                 disassembly pane, breakpoints)
 Settings.cs      INI-backed user preferences (settings.ini)
 docs/            Sharp service & owners' manuals (reference)
 roms/            Monitor ROM (1Z-013A) + character generator
