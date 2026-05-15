@@ -75,6 +75,7 @@ regardless of host speed.
 | Reset | Ctrl+R |
 | Display 1× / 2× / 3× | Ctrl+1 / Ctrl+2 / Ctrl+3 |
 | Debugger… | Ctrl+D |
+| Memory Viewer… | Ctrl+M |
 
 "Load BASIC source…" reads a plain-text `.bas` file and types each
 non-blank, non-comment line into the running BASIC interpreter. Lines
@@ -131,6 +132,23 @@ execution control and inspection:
 
 BASIC-aware panes (program listing, current line, variable table) are
 planned next.
+
+## Memory Viewer
+
+`Debug > Memory Viewer…` (Ctrl+M) opens a hex / ASCII view of the full
+64K address space as a companion to the debugger.
+
+- 16 bytes per row, address column on the left, two 8-byte hex groups
+  in the middle, ASCII column on the right.
+- Live updates: values change as the program runs so you can watch
+  RAM mutate in real time.
+- The row containing **PC** is shaded pale yellow with an orange marker
+  under the current byte; the row containing **SP** is shaded pale blue
+  with a blue marker. Quick **PC** and **SP** buttons jump there.
+- *Goto $XXXX* scrolls anywhere in the 64K space.
+- `$E000-$E00F` (the PPI/PIT I/O window) is shown as `--` rather than
+  read through, because real reads of those bytes have hardware side
+  effects (latching PIT counters, scanning the keyboard).
 
 ## Keyboard
 
@@ -201,6 +219,10 @@ MainForm         Window, menu, timer-driven RunFrame loop, CLI auto-load
 MZ700            Top-level "machine" that wires CPU + I/O + ROMs
 DebuggerForm.cs  Debugger window (execution control, registers,
                  disassembly pane, breakpoints)
+MemoryViewerForm.cs  Hex / ASCII memory viewer (companion to the
+                 debugger; PC / SP highlighting, live updates)
+SmoothControls.cs    Double-buffered Label / ListBox / TableLayoutPanel
+                 subclasses used by the debugger windows
 Settings.cs      INI-backed user preferences (settings.ini)
 docs/            Sharp service & owners' manuals (reference)
 roms/            Monitor ROM (1Z-013A) + character generator
