@@ -56,6 +56,10 @@ public sealed class MainForm : Form
         _display.TabStop = false;
 
         _statusLabel.Spring = true;
+        // ToolStripStatusLabel defaults to MiddleCenter; status messages
+        // should sit consistently at the left edge so they're predictable
+        // to read and don't jump as text length changes.
+        _statusLabel.TextAlign = ContentAlignment.MiddleLeft;
         _status.Items.Add(_statusLabel);
         _status.Items.Add(_joyStatus);
         _statusLabel.Text = "Ready.";
@@ -195,20 +199,33 @@ public sealed class MainForm : Form
             // given .mzf is MC or BASIC — they just point the emulator at
             // it and the right boot path runs.
             bool loadBasic = _autoLoadBasic;
+            bool cassetteNeedsBasic = false;
             if (_initialCassette != null)
             {
                 try
                 {
                     var img = Hardware.Cassette.Parse(Hardware.CassetteFile.ReadBytes(_initialCassette));
-                    if (img.Type == 0x02 || img.Type == 0x05) loadBasic = true;
+                    if (img.Type == 0x02 || img.Type == 0x05) { loadBasic = true; cassetteNeedsBasic = true; }
                 }
                 catch { /* let the Timer_Tick load path surface the error with a clearer status */ }
                 _pendingCassette = _initialCassette;
             }
             if (loadBasic)
             {
-                // Run a few frames so the monitor boots before injecting BASIC
-                _pendingLoadBasic = true;
+                // Pre-flight the BASIC file so the failure shows up as a modal
+                // at startup (parity with the menu's Load BASIC) rather than a
+                // quiet status-bar line many frames later. If BASIC is missing
+                // we cancel the auto-load — and the pending cassette too, when
+                // it can't run without BASIC.
+                if (EnsureBasicAvailable())
+                {
+                    // Run a few frames so the monitor boots before injecting BASIC
+                    _pendingLoadBasic = true;
+                }
+                else if (cassetteNeedsBasic)
+                {
+                    _pendingCassette = null;
+                }
             }
             _timer.Start();
             _statusLabel.Text = "Running.";
@@ -325,10 +342,26 @@ public sealed class MainForm : Form
         // clean stack). Replaces a previous fixed 180-frame wait.
         if (_pendingLoadBasic && MonitorReady())
         {
-            try { _machine.AutoLoadBasic(_settings.BasicFullPath); _statusLabel.Text = "BASIC loaded."; }
-            catch (Exception ex) { _statusLabel.Text = "BASIC load failed: " + ex.Message; }
-            _pendingLoadBasic = false;
-            _basicLoadedFrame = _bootFrames;
+            try
+            {
+                _machine.AutoLoadBasic(_settings.BasicFullPath);
+                _statusLabel.Text = "BASIC loaded.";
+                _pendingLoadBasic = false;
+                _basicLoadedFrame = _bootFrames;
+            }
+            catch (Exception ex)
+            {
+                // Defence-in-depth: entry-point checks should have caught a
+                // missing BASIC, but if the load fails here (file vanished,
+                // unreadable, parse error), behave like the menu's Load
+                // BASIC — modal error, abandon any dependent pending work.
+                _pendingLoadBasic = false;
+                _pendingCassette = null;
+                _pendingBasicSource = null;
+                _statusLabel.Text = "BASIC load failed.";
+                MessageBox.Show(this, "BASIC load failed:\n" + ex.Message,
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
         // Cassette injection: wait 60 frames after BASIC was loaded so its
         // banner displays and READY prompt is reached before we auto-type
@@ -598,6 +631,11 @@ public sealed class MainForm : Form
 
             if (basicLoaded || needsBasic)
             {
+                // Pre-flight the BASIC file. If the cassette needs BASIC and
+                // it's missing, abort the whole load: a BASIC program can't
+                // run without the interpreter, and continuing would only
+                // result in junk getting typed into the monitor.
+                if (needsBasic && !EnsureBasicAvailable()) return;
                 ResetMachine();
                 if (needsBasic) _pendingLoadBasic = true;
                 _pendingCassette = path;
@@ -627,6 +665,7 @@ public sealed class MainForm : Form
 
     private void LoadBasic()
     {
+        if (!EnsureBasicAvailable()) return;
         try
         {
             _machine.AutoLoadBasic(_settings.BasicFullPath);
@@ -637,6 +676,31 @@ public sealed class MainForm : Form
         {
             MessageBox.Show(this, "BASIC load failed:\n" + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
+    }
+
+    /// <summary>
+    /// Pre-flight check used by every entry point that triggers a BASIC
+    /// load (menu, CLI, BASIC-cassette auto-load, Load BASIC source). When
+    /// the configured BASIC image is missing, shows a modal and returns
+    /// false so the caller can abort cleanly — without this, the deferred
+    /// load in <see cref="Timer_Tick"/> would surface the failure only as
+    /// a status-bar line and the rest of the pending operation would
+    /// proceed regardless.
+    /// </summary>
+    private bool EnsureBasicAvailable()
+    {
+        var path = _settings.BasicFullPath;
+        if (!string.IsNullOrEmpty(path) && File.Exists(path)) return true;
+        var configured = string.IsNullOrEmpty(_settings.BasicPath)
+            ? "(none configured)"
+            : $"{_settings.BasicPath}  →  {_settings.BasicFullPath}";
+        MessageBox.Show(this,
+            "BASIC cassette image (1Z-013B.mzf) not found.\n\n" +
+            $"Configured path: {configured}\n\n" +
+            $"Place 1Z-013B.mzf under a 'basic' or 'roms' folder next to the executable, " +
+            $"or set [Roms] Basic= in {Path.Combine(AppContext.BaseDirectory, "settings.ini")}.",
+            "BASIC not found", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        return false;
     }
 
     private void BrowseAndLoadBasicSource()
@@ -663,6 +727,7 @@ public sealed class MainForm : Form
         {
             if (_basicLoadedFrame < 0)
             {
+                if (!EnsureBasicAvailable()) return;
                 ResetMachine();
                 _pendingLoadBasic = true;
                 _pendingBasicSource = path;
