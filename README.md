@@ -5,10 +5,13 @@ A Sharp MZ-700 emulator written in C# / .NET 8 (WinForms). The aims of this emul
 1. Work well enough play the MZ-700 games I remember from my childhood
 2. Be useable from a launcher such as Launchbox or Playnite, taking into account the need for a lot of games to have BASIC present before they can be loaded
 
-This means that the goal is for the emulator to work 'well enough' without necessarily worrying about accurately reproducing how the actual MZ-700 hardware works.
+This means that the goal is for the emulator to work 'well enough', and with some quality-of-life features to enable the above, without necessarily worrying about accurately reproducing how the actual MZ-700 hardware works.
 
 ***
 IMPORTANT NOTE - The emulator code is *entirely* AI generated. Although I have some development experience, how CPUs etc work is outside my skillset so what is here is a result of several days of me working with Claude to produce the features and refinements I need for my use case. I chose to use C# as it is a language I know, so I can use how the project has been put together to educate myself on what it takes to create an emulator. The choice to use WinForms, effectively tying the current implementation tightly to Windows, was also made as it suits my specific needs.
+
+Another aim was to see whether something like this is even possible using an AI tool. I think the result is pretty impressive. It's not perfect, far from it, but it does work. I think this is an appropriate use of these tools. I don't think anyone would be using a trivial emulator such as this for anything critical to their lives.
+
 ***
 
 ## Status

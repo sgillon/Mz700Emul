@@ -33,3 +33,5 @@ interpreter. Lines starting with `;` or `'` are stripped on the host
 side. If BASIC isn't loaded yet the emulator resets, auto-loads BASIC,
 then types the source once the READY prompt is up. End the file with
 `RUN` to auto-start the program.
+
+This feature is currently very slow, but will hopefully improve in the future.

@@ -8,11 +8,11 @@ The input bridge uses the WinMM `joyGetPosEx` API rather than XInput,
 so non-XInput pads (older PC gamepads, USB SNES adapters, bare PS3/PS4
 pads, etc.) are picked up too. When a controller is connected the
 status bar shows e.g. `Joy: 1[X128 Y128]`; without a controller, $E008
-returns "idle / not pressed" so games like `panic.mzf` boot normally.
+returns "idle / not pressed" so games like Space Panic boot normally.
 
 - Stick axes drive the 555-monostable pulses on $E008 bits 1-4 during
   the visible portion of the frame. Pulse-low duration is calibrated
-  against `panic.mzf`'s read routine — full-deflection reads as 0/255,
+  against Space Panic's read routine — full-deflection reads as 0/255,
   centred reads as 128.
 - The POV hat (D-pad on most pads) overrides the analog axes when
   held, giving clean 0 / 128 / 255 quantisation for BASIC `JOY()`-style
