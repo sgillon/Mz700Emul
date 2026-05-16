@@ -24,17 +24,14 @@
     <None Remove="tools/**/*" />
   </ItemGroup>
 
+  <!-- Copyrighted ROM / BASIC images are NOT shipped with this project.
+       Users must supply their own copies under roms\ and basic\ next to
+       the source tree (or next to the published executable); Settings.cs
+       walks up from the run directory to find them, and settings.ini
+       records the resolved paths. See the Quickstart in README.md. -->
   <ItemGroup>
-    <None Update="roms\1z-013a.rom">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="roms\mz700fon.int">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="roms\font_hex.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="basic\1Z-013B.mzf">
+    <None Include="roms\*.rom;roms\*.int;roms\*.txt;basic\*.mzf"
+          Condition="Exists('roms\1z-013a.rom') or Exists('roms\mz700fon.int') or Exists('basic\1Z-013B.mzf')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

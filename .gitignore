@@ -26,3 +26,16 @@ resumeproject.bat
 
 # other files
 .claude/
+
+# User-supplied ROM / BASIC images (Sharp Corp. copyright — not shipped)
+roms/*.rom
+roms/*.int
+roms/*.txt
+basic/*.mzf
+
+# Commercial cassette images — put your own here, they will not be tracked
+games/*.mzf
+games/*.m12
+games/*.mzt
+games/*.zip
+!games/joytest.mzf

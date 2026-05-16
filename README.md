@@ -13,7 +13,7 @@ IMPORTANT NOTE - The emulator code is *entirely* AI generated. Although I have s
 
 ## Status
 
-The emulator is generally functional with some known imperfections (listed below). 
+The emulator is generally functional with some known imperfections (listed below).
 
 Boots the 1Z-013A monitor, runs S-BASIC (1Z-013B), plays
 sound, and accepts PC keystrokes via the host keyboard layout (no
@@ -25,18 +25,35 @@ transparently. MZ-1X03 joysticks are emulated and driven from any
 Windows-recognised game controller. Tested against several commercial
 titles (Nightmare Park, Star Trek, Space Panic, etc.).
 
+## Quickstart
 
-## Requirements
+The emulator itself is freely available, but the MZ-700 firmware that
+makes it useful is Sharp Corporation's copyright and is **not**
+distributed here. You'll need to source three files yourself (search
+for "MZ-700 ROMs" — they're widely archived by MZ enthusiasts) and
+drop them into the install directory:
 
-- Windows
-- .NET 8 SDK
-- Sharp MZ-700 ROMs (`1z-013a.rom`, `mz700fon.int`) and the S-BASIC
-  cassette image (`1Z-013B.mzf`). On first run the emulator scans
-  alongside the executable and inside `roms/` / `basic/` for these
-  files and records their locations in `settings.ini` — you can move
-  them around afterwards by editing the `[Roms]` section. The repo
-  includes the files used during development; provide your own if you
-  don't have rights to those.
+| File | Where it goes | What it is |
+|---|---|---|
+| `1z-013a.rom` | `roms\` | The MZ-700 monitor ROM (4 KiB). |
+| `mz700fon.int` | `roms\` | The character-generator ROM (font data). |
+| `1Z-013B.mzf` | `basic\` (or `roms\`) | Sharp's S-BASIC interpreter, supplied on cassette. |
+
+Layout next to `MZ700Emul.exe`:
+
+```
+MZ700Emul.exe
+roms\
+  1z-013a.rom
+  mz700fon.int
+basic\
+  1Z-013B.mzf
+```
+
+The first launch scans these folders, records the resolved paths in
+`settings.ini`, and starts the emulator. If a file is missing the
+emulator reports it with a modal error and tells you exactly where
+it looked.
 
 ## Build & run
 
@@ -77,13 +94,6 @@ regardless of host speed.
 | Debugger… | Ctrl+D |
 | Memory Viewer… | Ctrl+M |
 
-"Load BASIC source…" reads a plain-text `.bas` file and types each
-non-blank, non-comment line into the running BASIC interpreter. Lines
-starting with `;` or `'` are stripped on the host side. If BASIC
-isn't loaded yet the emulator resets, auto-loads BASIC, then types
-the source once the READY prompt is up. End the file with `RUN` to
-auto-start the program. See `games/joytest.bas` for an example.
-
 You can also drag and drop an `.mzf` (or a `.zip` containing one) onto
 the window. Loading a cassette resets the emulator first, so opening
 a different program mid-execution Just Works regardless of whether the
@@ -107,105 +117,20 @@ install stays portable) and absolute when the file lives elsewhere.
 If a path goes stale (file moved or deleted), the next launch
 re-scans the standard locations and patches the file up.
 
-## Debugger
+## Documentation
 
-`Debug > Debugger…` (Ctrl+D) opens a debugger window. It provides CPU
-execution control and inspection:
+Topic-by-topic guides live under [`docs/usage/`](docs/usage/):
 
-- **Pause / Resume** (F5), **Step** one instruction (F10), **Step
-  Frame** (F11), and **Reset**. Pausing freezes the CPU between
-  instructions while the screen keeps refreshing — nothing blocks, so
-  the emulator and debugger stay responsive.
-- A live **Z80 register view**: `PC`, `SP`, the main and alternate
-  register pairs, `IX`/`IY`, `I`/`R`/`IM`, the interrupt flip-flops and
-  halt state, decoded flags, and the total cycle count.
-- A **disassembly pane** with PC highlighting (yellow, `>` marker) and
-  breakpoint highlighting (pink, `*` marker). **Double-click a line to
-  toggle a breakpoint** at that address. *Goto $* jumps anywhere in the
-  64K space; *Follow PC* (on by default) keeps the current instruction
-  on screen while paused. Up/Down, PgUp/PgDn and the mouse wheel
-  navigate; Home re-centres on PC. Manual scroll switches Follow PC
-  off.
-- An address-based **breakpoint manager**: enter a hex address to add a
-  breakpoint, or just use the double-click in the disassembly pane.
-  Execution stops with `PC` parked on the breakpointed instruction.
-
-BASIC-aware panes (program listing, current line, variable table) are
-planned next.
-
-## Memory Viewer
-
-`Debug > Memory Viewer…` (Ctrl+M) opens a hex / ASCII view of the full
-64K address space as a companion to the debugger.
-
-- 16 bytes per row, address column on the left, two 8-byte hex groups
-  in the middle, ASCII column on the right.
-- Live updates: values change as the program runs so you can watch
-  RAM mutate in real time.
-- The row containing **PC** is shaded pale yellow with an orange marker
-  under the current byte; the row containing **SP** is shaded pale blue
-  with a blue marker. Quick **PC** and **SP** buttons jump there.
-- *Goto $XXXX* scrolls anywhere in the 64K space.
-- `$E000-$E00F` (the PPI/PIT I/O window) is shown as `--` rather than
-  read through, because real reads of those bytes have hardware side
-  effects (latching PIT counters, scanning the keyboard).
-
-## Keyboard
-
-The emulator drives the MZ-700 matrix from the **character** your PC
-keystroke produces, after Windows has applied your keyboard layout.
-Type `;` and the MZ sees `;`; type `+` and it sees `+`; type `:` and it
-sees `:`. There is no per-key configuration — the host OS handles
-layout, AltGr, and dead keys for you, and the emulator translates the
-resulting Unicode character to the corresponding MZ-700 matrix
-position (and shift state, where needed).
-
-Non-character keys are mapped directly:
-
-| PC key | MZ-700 |
-|---|---|
-| Enter | CR |
-| Backspace / Delete | DEL |
-| Insert | INS |
-| Esc | BREAK |
-| Cursor keys | Cursor |
-| Left/Right Ctrl | MZ Ctrl |
-| F1–F4 | F1–F4 |
-
-The translation table lives in `Hardware/CharMap.cs` (printables) and
-`Hardware/SpecialKeyMap.cs` (non-printables). MZ-only glyphs (graphics
-blocks, kana) aren't reachable in this scheme — that's an intentional
-trade-off for not having to configure anything.
-
-## Joystick
-
-The emulator emulates the **Sharp MZ-1X03** dual-joystick interface,
-fed from any Windows-recognised game controller. Up to two controllers
-are supported (slot 0 → MZ stick 1, slot 1 → MZ stick 2).
-
-The input bridge uses the WinMM `joyGetPosEx` API rather than XInput,
-so non-XInput pads (older PC gamepads, USB SNES adapters, bare PS3/PS4
-pads, etc.) are picked up too. When a controller is connected the
-status bar shows e.g. `Joy: 1[X128 Y128]`; without a controller, $E008
-returns "idle / not pressed" so games like `panic.mzf` boot normally.
-
-- Stick axes drive the 555-monostable pulses on $E008 bits 1-4 during
-  the visible portion of the frame. Pulse-low duration is calibrated
-  against `panic.mzf`'s read routine — full-deflection reads as 0/255,
-  centred reads as 128.
-- The POV hat (D-pad on most pads) overrides the analog axes when
-  held, giving clean 0 / 128 / 255 quantisation for BASIC `JOY()`-style
-  reads.
-- Buttons 1 and 2 map to SW1 and SW2 on each stick (active-low during
-  vertical blanking).
-
-Two test programs live in `games/`:
-- `games/joytest.bas` — BASIC test that draws a `+` on screen tracking
-  stick 1.
-- `games/joytest.mzf` — same as a machine-code cassette.
-
-The relevant code: `Hardware/Joystick.cs` (MZ-side multiplexing on
-$E008), `Hardware/JoystickInput.cs` (WinMM bridge).
+- [Debugger](docs/usage/debugger.md) — execution control, register
+  view, disassembly pane, breakpoints.
+- [Memory viewer](docs/usage/memory-viewer.md) — live hex / ASCII view
+  of the 64K address space with PC and SP highlighting.
+- [Keyboard](docs/usage/keyboard.md) — how host keystrokes are mapped
+  to the MZ-700 matrix; loading `.bas` source files.
+- [Joystick](docs/usage/joystick.md) — MZ-1X03 emulation driven from
+  any Windows-recognised game controller.
+- [Hardware notes](docs/usage/hardware-notes.md) — MZ-700 hardware
+  quirks the code learned the hard way (PIT topology, $E008, etc.).
 
 ## Project layout
 
@@ -224,38 +149,51 @@ MemoryViewerForm.cs  Hex / ASCII memory viewer (companion to the
 SmoothControls.cs    Double-buffered Label / ListBox / TableLayoutPanel
                  subclasses used by the debugger windows
 Settings.cs      INI-backed user preferences (settings.ini)
-docs/            Sharp service & owners' manuals (reference)
-roms/            Monitor ROM (1Z-013A) + character generator
-basic/           S-BASIC (1Z-013B) cassette image
-games/           Sample MZF cassette images
+docs/usage/      Topic-by-topic usage docs
+roms/            (You supply) Monitor ROM + character generator
+basic/           (You supply) S-BASIC cassette image
+games/           Joystick test program (joytest.bas / .mzf)
 ```
 
 ## Known limitations & imperfections
 
 - MZ-only glyphs (graphics blocks, kana) aren't reachable from a PC
   keyboard in the current char-driven model — by design.
-- Sound reproduction isn't quite right. It works well enough to play most games, but sometimes sounds are missing and I'm not confident about the timings
-- Some issues in BASIC. For example, in Solo Software's version of Star Trek, there seems to be an issue parsing variables for things like the long range and galactic maps
-- Saving to cassette is not currently possible
+- Sound reproduction isn't quite right. It works well enough to play most games, but sometimes sounds are missing and I'm not confident about the timings.
+- Some issues in BASIC. For example, in Solo Software's version of Star Trek, there seems to be an issue parsing variables for things like the long range and galactic maps.
+- Saving to cassette is not currently possible.
 
-## Hardware notes
+## Planned future work
 
-A handful of MZ-700 hardware quirks the code learned the hard way and
-documents inline:
+Items I'd like to come back to (rough priority order):
 
-- The PIT topology is C0 standalone (audio at ~895 kHz); C1 standalone
-  (rate generator at 15.6 kHz, OUT1 → CLK2); C2 cascaded from C1.OUT
-  (12-hour RTC, OUT2 → CPU INT). Earlier "obvious" wirings were wrong.
-- `$E008` bit 0 is the 555/556 cursor-osc / "tempo" signal at ~50 Hz
-  toggle (tuned against real-hardware MUSIC playback length), **not**
-  the 8253 OUT1.
-- BASIC's MUSIC duration polls `$E008` bit 0 — getting that signal's
-  rate right is what makes a 13-second tune actually take 13 seconds.
-- BASIC's text-area pointer (TXTTAB) lives at `$6ABF`; the cassette
-  loader updates it so programs whose load address differs from the
-  default `$6BCF` (e.g. `trek.mzf` at `$6BDF`) `LIST` and `RUN`
-  correctly.
-- `$E008` bits 1-6 are joystick lines (active-low, via an LS367 buffer)
-  and must default to **1** ("idle / not pressed") when no joystick is
-  connected. Returning 0 there makes joystick games (e.g.
-  `panic.mzf`) auto-start and run with all directions held.
+- **BASIC-aware debugger panes** — program lister with de-tokenised
+  output, current-line indicator, variable-table reader. Primarily to
+  help track down the Star Trek variable-parsing bug.
+- **Current-line highlighting** in the source view once the BASIC
+  line pointer is wired up.
+- **Persisted debugger state** — remember window placement and the
+  breakpoint list across runs (in `settings.ini`).
+- **BASIC source editor pane** — read the live BASIC program out of
+  RAM, render it in an editable text pane, and write edits back.
+- **Configurable keyboard mapping (GUI)** — host-key → MZ-matrix
+  mapping editable via a settings dialog, persisted to file.
+- **Settings dialog** — replace direct `settings.ini` editing with a
+  tabbed UI once there are enough groups to justify it (sound, joystick
+  mapping, user-editable keyboard glyphs).
+- **Hotkeys for the remaining menu items.**
+- **Cassette save support.**
+
+## Acknowledgements
+
+- **NAudio** (Mark Heath and contributors, [MIT license](https://github.com/naudio/NAudio/blob/master/license.txt))
+  — audio output backend.
+- **Sharp Corporation** — original MZ-700 hardware and ROM firmware.
+  All ROM/BASIC files referenced in [Quickstart](#quickstart) remain
+  Sharp's copyright; this project ships neither, and only describes
+  how to locate copies you are entitled to use.
+- The wider **MZ-700 enthusiast community** for the disassemblies,
+  service manuals, and games preservation work that made this project
+  possible.
+- **Anthropic Claude** — as noted at the top of this README, the
+  entire codebase was generated through pair-programming with Claude.
