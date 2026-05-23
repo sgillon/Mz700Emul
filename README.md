@@ -190,8 +190,7 @@ Items I'd like to come back to (rough priority order):
   gamepad buttons to MZ-1X03 buttons via a config dialog, rather than
   the current hardcoded mapping.
 - **BASIC-aware debugger panes** — program lister with de-tokenised
-  output, current-line indicator, variable-table reader. Now a general
-  inspection aid rather than a trek-debug tool.
+  output, current-line indicator, variable-table reader.
 - **Current-line highlighting** in the source view once the BASIC
   line pointer is wired up.
 - **Persisted debugger state** — remember window placement and the
