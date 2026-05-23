@@ -1,5 +1,4 @@
 using System;
-using NAudio.Wave;
 
 namespace MZ700Emul.Hardware;
 
@@ -12,8 +11,13 @@ namespace MZ700Emul.Hardware;
 public sealed class Sound : IDisposable
 {
     private const int SampleRate = 44100;
-    private WaveOutEvent? _wave;
-    private BufferedWaveProvider? _provider;
+    private const int ChunkMs = 20;
+    private const int SamplesPerChunk = SampleRate * ChunkMs / 1000;   // 882
+    private const int BytesPerChunk = SamplesPerChunk * 2;             // 1764 (16-bit mono)
+    private const int BufferCount = 16;                                // ~320 ms of headroom
+    private const double TargetBufferMs = 100.0;                       // feed-loop throttle
+
+    private WinmmWaveOut? _wave;
     private System.Threading.Thread? _thread;
     private volatile bool _running;
 
@@ -25,14 +29,7 @@ public sealed class Sound : IDisposable
 
     public void Start()
     {
-        _wave = new WaveOutEvent { DesiredLatency = 100 };
-        _provider = new BufferedWaveProvider(new WaveFormat(SampleRate, 16, 1))
-        {
-            BufferDuration = TimeSpan.FromMilliseconds(400),
-            DiscardOnBufferOverflow = true
-        };
-        _wave.Init(_provider);
-        _wave.Play();
+        _wave = new WinmmWaveOut(SampleRate, 16, 1, BytesPerChunk, BufferCount);
         _running = true;
         _thread = new System.Threading.Thread(FeedLoop) { IsBackground = true };
         _thread.Start();
@@ -40,9 +37,7 @@ public sealed class Sound : IDisposable
 
     private void FeedLoop()
     {
-        const int chunkMs = 20;
-        int samplesPerChunk = SampleRate * chunkMs / 1000;
-        byte[] buf = new byte[samplesPerChunk * 2];
+        byte[] buf = new byte[BytesPerChunk];
         double phase = 0;
         while (_running)
         {
@@ -54,7 +49,7 @@ public sealed class Sound : IDisposable
                 if (!gate || freq < 20 || freq > 20000) freq = 0;
 
                 double step = (freq > 0) ? freq / SampleRate : 0;
-                for (int i = 0; i < samplesPerChunk; i++)
+                for (int i = 0; i < SamplesPerChunk; i++)
                 {
                     short s = 0;
                     if (freq > 0)
@@ -66,11 +61,11 @@ public sealed class Sound : IDisposable
                     buf[i * 2] = (byte)s;
                     buf[i * 2 + 1] = (byte)(s >> 8);
                 }
-                if (_provider != null)
+                if (_wave != null)
                 {
-                    while (_provider.BufferedDuration.TotalMilliseconds > 100 && _running)
+                    while (_wave.BufferedDuration.TotalMilliseconds > TargetBufferMs && _running)
                         System.Threading.Thread.Sleep(5);
-                    _provider.AddSamples(buf, 0, buf.Length);
+                    _wave.AddSamples(buf, 0, buf.Length);
                 }
             }
             catch { /* ignore */ }
@@ -81,7 +76,7 @@ public sealed class Sound : IDisposable
     {
         _running = false;
         try { _thread?.Join(200); } catch { }
-        _wave?.Stop();
         _wave?.Dispose();
+        _wave = null;
     }
 }

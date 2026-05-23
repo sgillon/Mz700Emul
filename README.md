@@ -32,7 +32,14 @@ titles (Nightmare Park, Star Trek, Space Panic, etc.).
 instruction exercisers from the CP/M Users Group, covering documented
 and undocumented behaviour (including the X/Y flag bits). The harness
 is built in (`Debug → Run Z80 Test…`) and can be re-run any time
-against the supplied `tools/CPM/zexdoc.com` / `zexall.com`.
+against the supplied `tools/CPM/zexdoc.com` / `zexall.com`. The Z80
+core is also a separate class-library project (`Z80Core.dll`),
+reusable for other Z80-based machines.
+
+**Zero third-party runtime dependencies** — the published bundle is
+`MZ700Emul.exe`, `MZ700Emul.dll`, `Z80Core.dll`, and two small JSON
+config files. Sound goes through Windows' built-in `winmm.dll`
+directly (the same DLL the joystick code uses).
 
 ## Quickstart
 
@@ -206,21 +213,12 @@ Items I'd like to come back to (rough priority order):
 
 ### Longer-term / infrastructure
 
-- **Reduce non-standard .NET dependencies** — NAudio is the only
-  external NuGet package and brings 3 DLLs (~250 KB). It wraps
-  Windows' built-in `winmm.dll` `waveOut*` API, which we already
-  P/Invoke for the joystick. Replacing it with direct P/Invoke would
-  take the published bundle to zero third-party runtime dependencies
-  (just `MZ700Emul.exe` + `Z80Core.dll` + two JSON config files,
-  plus the user-supplied ROM/BASIC).
 - **Single-file publish** (`<PublishSingleFile>true</PublishSingleFile>`)
-  — once dependencies are minimised, fold the remaining DLLs into a
-  single self-extracting `.exe` for the smallest possible ship.
+  — fold the remaining DLLs into a single self-extracting `.exe` for
+  the smallest possible ship.
 
 ## Acknowledgements
 
-- **NAudio** (Mark Heath and contributors, [MIT license](https://github.com/naudio/NAudio/blob/master/license.txt))
-  — audio output backend.
 - **Sharp Corporation** — original MZ-700 hardware and ROM firmware.
   All ROM/BASIC files referenced in [Quickstart](#quickstart) remain
   Sharp's copyright; this project ships neither, and only describes
