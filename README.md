@@ -73,6 +73,12 @@ The first launch scans these folders, records the resolved paths in
 emulator reports it with a modal error and tells you exactly where
 it looked.
 
+### Using the emulator from a game launcher
+
+See [LAUNCHERSETUP.md](LAUNCHERSETUP.md) for step-by-step instructions
+on wiring MZ700Emul into popular Windows game launchers (Launchbox so
+far, more to follow).
+
 ## Build & run
 
 ```
