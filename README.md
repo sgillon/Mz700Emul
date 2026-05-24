@@ -239,5 +239,9 @@ Items I'd like to come back to (rough priority order):
 - The wider **MZ-700 enthusiast community** for the disassemblies,
   service manuals, and games preservation work that made this project
   possible.
+- Ben at **Sharpworks (https://mz-sharpworks.co.uk/)** - Ben also maintains
+  the Sharp MZ Software Archive (https://mz-archive.co.uk/) which is an
+  invaluable resource for MZ software. Sharpworks also publish brand new MZ
+  titles on cassette and should be supported for that alone.
 - **Anthropic Claude** — as noted at the top of this README, the
   entire codebase was generated through pair-programming with Claude.
