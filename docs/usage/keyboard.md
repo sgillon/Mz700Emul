@@ -8,6 +8,11 @@ layout, AltGr, and dead keys for you, and the emulator translates the
 resulting Unicode character to the corresponding MZ-700 matrix
 position (and shift state, where needed).
 
+Printable coverage includes the alphanumeric keys, common punctuation,
+and the row-1 brackets/braces `[` `]` `{` `}`. `*` lives on the
+MZ-700's shift-colon key, so typing `*` on the PC keyboard produces
+`*` on the MZ.
+
 Non-character keys are mapped directly:
 
 | PC key | MZ-700 |
@@ -15,7 +20,7 @@ Non-character keys are mapped directly:
 | Enter | CR |
 | Backspace / Delete | DEL |
 | Insert | INS |
-| Esc | BREAK |
+| Esc | BREAK (use **Shift+Esc** to break a running BASIC program — the manual requires BREAK to be shifted) |
 | Cursor keys | Cursor |
 | Left/Right Ctrl | MZ Ctrl |
 | F1–F4 | F1–F4 |
@@ -34,4 +39,7 @@ side. If BASIC isn't loaded yet the emulator resets, auto-loads BASIC,
 then types the source once the READY prompt is up. End the file with
 `RUN` to auto-start the program.
 
-This feature is currently very slow, but will hopefully improve in the future.
+Per-character throughput is around 6–8 chars/sec — the auto-typer
+waits for the OS's keyboard scan to actually observe each press before
+moving on, rather than hardcoding a hold duration. Still not instant
+for long listings, but reliable across shifted characters.

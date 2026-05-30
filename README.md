@@ -75,9 +75,9 @@ it looked.
 
 ### Using the emulator from a game launcher
 
-See [LAUNCHERSETUP.md](LAUNCHERSETUP.md) for step-by-step instructions
-on wiring MZ700Emul into popular Windows game launchers (Launchbox so
-far, more to follow).
+See [Launcher setup](docs/usage/launcher-setup.md) for step-by-step
+instructions on wiring MZ700Emul into popular Windows game launchers
+(Launchbox so far, more to follow).
 
 ## Build & run
 
@@ -166,6 +166,8 @@ Topic-by-topic guides live under [`docs/usage/`](docs/usage/):
   any Windows-recognised game controller.
 - [Hardware notes](docs/usage/hardware-notes.md) — MZ-700 hardware
   quirks the code learned the hard way (PIT topology, $E008, etc.).
+- [Launcher setup](docs/usage/launcher-setup.md) — wiring MZ700Emul
+  into Launchbox (and other launchers to come).
 
 ## Project layout
 
@@ -197,23 +199,17 @@ games/           Joystick test program (joytest.bas / .mzf)
 - MZ-only glyphs (graphics blocks, kana) aren't reachable from a PC
   keyboard in the current char-driven model — by design.
 - Sound reproduction isn't quite right. It works well enough to play most games, but sometimes sounds are missing and I'm not confident about the timings.
-- Auto-typed input (BASIC source paste / command auto-load) is still
-  hit-and-miss with shifted characters and is slow enough to be a
-  bottleneck when dumping long listings.
-- A few PC keys still don't map cleanly to their MZ-700 equivalents
-  (`*` is the known offender; broader verification pending).
+- Auto-typed input (BASIC source paste / command auto-load) runs at
+  around 6–8 chars/sec — fine for short snippets, slow for long
+  listings.
 
 ## Planned future work
 
 Items I'd like to come back to (rough priority order):
 
-- **Auto-typer reliability + speed** — fix shifted-character drops and
-  raise throughput so pasting BASIC source / auto-LIST dumps stop
-  being a bottleneck. Likely needs direct keyboard-buffer injection
-  rather than driving the matrix.
-- **Keyboard mapping verification + GUI editor** — sweep the PC→MZ
-  character map (`*` and any other strays) and expose it as a
-  user-editable mapping persisted to a file.
+- **Keyboard-map GUI editor** — expose the PC→MZ character map as a
+  user-editable mapping persisted to a file, alongside the gamepad
+  editor below.
 - **Game controller button mapping (GUI)** — let the user assign host
   gamepad buttons to MZ-1X03 buttons via a config dialog, rather than
   the current hardcoded mapping.
