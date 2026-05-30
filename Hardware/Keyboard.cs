@@ -60,9 +60,16 @@ public sealed class Keyboard
         for (int i = 0; i < 10; i++) _rows[i] = 0xFF;
     }
 
+    // Bit N set means the OS has scanned row N since the auto-typer last
+    // cleared the mask. The auto-typer uses this to release a key only
+    // after the OS has actually observed it (rather than holding for a
+    // hardcoded number of host frames and hoping).
+    private int _scanMask;
+
     public byte ReadRow(int strobe)
     {
         if (strobe < 0 || strobe > 9) return 0xFF;
+        _scanMask |= 1 << strobe;
         return _rows[strobe];
     }
 
@@ -178,12 +185,37 @@ public sealed class Keyboard
     // ---- Auto-typing (used by CLI auto-load to send "RUN\r" etc.) -------
     //
     // Re-uses the same CharMap so the live and auto-typed paths agree on
-    // every glyph mapping. Each queued press holds the matrix bits for a
-    // few ticks then releases them; the loader polls TickAutoType per
-    // frame.
+    // every glyph mapping. Driven by detection rather than blind hold
+    // counts (see _scanMask above). TickAutoType is polled per frame by
+    // MZ700.RunFrame.
+    //
+    // Shifted keys are staged: shift bit is asserted first, we wait for
+    // the OS to actually scan row 8 (so it has the shift state on file),
+    // THEN we assert the key. Without this, the OS can capture a key-down
+    // observation before its first scan of row 8 with our bit set, and
+    // permanently mis-classify the press as unshifted.
     private readonly Queue<CharMap.Press> _typeQueue = new();
-    private int _typeTimer;
     private CharMap.Press? _current;
+    private enum AutoPhase
+    {
+        Idle,
+        AwaitShiftScan,   // shifted keys only — wait for OS to see shift
+        AwaitKeyScan,     // wait for OS to see the key (with shift if any)
+        AwaitRelease,     // wait for OS to see key-up
+        EnterCooldown     // BASIC line-parse delay after Enter
+    }
+    private AutoPhase _phase;
+    private int _phaseFramesLeft;
+
+    // Safety net: if the OS isn't scanning the keyboard (e.g. interrupts
+    // masked, mid-routine), don't wait forever. ~10 host frames (~167ms)
+    // is well under the old 12-frame fixed hold but generous enough to
+    // cover any realistic gap between scan bursts.
+    private const int ScanTimeoutFrames = 10;
+    // After Enter, BASIC tokenises and inserts the line; the scan-loop
+    // pauses during that work. Hold this fixed cooldown to give BASIC
+    // headroom before the next press lands. Empirical, same as before.
+    private const int EnterCooldownFrames = 30;
 
     public void TypeString(string s)
     {
@@ -203,44 +235,94 @@ public sealed class Keyboard
 
     public void TickAutoType()
     {
-        if (_current.HasValue)
+        switch (_phase)
         {
-            _typeTimer--;
-            if (_typeTimer <= 0)
+            case AutoPhase.Idle:
             {
-                var p = _current.Value;
-                SetMatrix(p.Row, p.Col, false);
+                if (_typeQueue.Count == 0) return;
+                var p = _typeQueue.Dequeue();
+                _current = p;
+                // Set shift / $1170 to the press's required state in both
+                // cases — false explicitly clears any stale state left by
+                // a prior shifted press.
+                SetMatrix(8, 0, p.MzShift);
+                if (Memory != null) Memory.Ram[0x1170] = (byte)(p.MzShift ? 0x01 : 0x00);
+                _scanMask = 0;
                 if (p.MzShift)
                 {
-                    SetMatrix(8, 0, false);
-                    if (Memory != null) Memory.Ram[0x1170] = 0x00;
+                    // Stage shift first; key follows once OS has scanned row 8.
+                    _phase = AutoPhase.AwaitShiftScan;
                 }
-                _current = null;
-                // Standard inter-key gap is 4 frames. After Enter (matrix
-                // (0,0)) BASIC may be tokenising and inserting the line —
-                // 4 frames isn't long enough and the next press gets
-                // dropped. Use 30 frames (~0.5 s) so BASIC is back at
-                // its READY/input loop before we send the next line.
-                _typeTimer = (p.Row == 0 && p.Col == 0) ? 30 : 4;
+                else
+                {
+                    SetMatrix(p.Row, p.Col, true);
+                    _phase = AutoPhase.AwaitKeyScan;
+                }
+                _phaseFramesLeft = ScanTimeoutFrames;
+                break;
             }
-            return;
-        }
 
-        if (_typeTimer > 0) { _typeTimer--; return; }
+            case AutoPhase.AwaitShiftScan:
+            {
+                bool observed = (_scanMask & (1 << 8)) != 0;
+                if (observed || --_phaseFramesLeft <= 0)
+                {
+                    var pa = _current!.Value;
+                    SetMatrix(pa.Row, pa.Col, true);
+                    _scanMask = 0;
+                    _phase = AutoPhase.AwaitKeyScan;
+                    _phaseFramesLeft = ScanTimeoutFrames;
+                }
+                break;
+            }
 
-        if (_typeQueue.Count > 0)
-        {
-            var p = _typeQueue.Dequeue();
-            // Always set the shift bit + $1170 explicitly (not just when
-            // shifted). Otherwise a previous shifted-then-unshifted
-            // sequence can leave stale state. Hold for 12 frames (~200ms)
-            // so BASIC's matrix scan has comfortable margin to see both
-            // the shift bit and the key bit as concurrent.
-            SetMatrix(8, 0, p.MzShift);
-            if (Memory != null) Memory.Ram[0x1170] = (byte)(p.MzShift ? 0x01 : 0x00);
-            SetMatrix(p.Row, p.Col, true);
-            _current = p;
-            _typeTimer = 12;
+            case AutoPhase.AwaitKeyScan:
+            {
+                var pa = _current!.Value;
+                bool observed = (_scanMask & (1 << pa.Row)) != 0;
+                if (observed || --_phaseFramesLeft <= 0)
+                {
+                    // Release both key and (any) shift together.
+                    SetMatrix(pa.Row, pa.Col, false);
+                    if (pa.MzShift)
+                    {
+                        SetMatrix(8, 0, false);
+                        if (Memory != null) Memory.Ram[0x1170] = 0x00;
+                    }
+                    _scanMask = 0;
+                    _phase = AutoPhase.AwaitRelease;
+                    _phaseFramesLeft = ScanTimeoutFrames;
+                }
+                break;
+            }
+
+            case AutoPhase.AwaitRelease:
+            {
+                var pa = _current!.Value;
+                bool observed = (_scanMask & (1 << pa.Row)) != 0;
+                if (observed || --_phaseFramesLeft <= 0)
+                {
+                    if (pa.Row == 0 && pa.Col == 0)
+                    {
+                        _phase = AutoPhase.EnterCooldown;
+                        _phaseFramesLeft = EnterCooldownFrames;
+                    }
+                    else
+                    {
+                        _current = null;
+                        _phase = AutoPhase.Idle;
+                    }
+                }
+                break;
+            }
+
+            case AutoPhase.EnterCooldown:
+                if (--_phaseFramesLeft <= 0)
+                {
+                    _current = null;
+                    _phase = AutoPhase.Idle;
+                }
+                break;
         }
     }
 }
