@@ -212,12 +212,15 @@ games/           Joystick test program (joytest.bas / .mzf)
 
 Items I'd like to come back to (rough priority order):
 
+- **Tabbed settings dialog** — replace direct `settings.ini` editing
+  with a Ctrl+, dialog covering Display, ROMs, and Joystick to start.
+  Lays the groundwork for the next two items, which are awkward to
+  express in INI.
 - **Keyboard-map GUI editor** — expose the PC→MZ character map as a
-  user-editable mapping persisted to a file, alongside the gamepad
-  editor below.
-- **Game controller button mapping (GUI)** — let the user assign host
-  gamepad buttons to MZ-1X03 buttons via a config dialog, rather than
-  the current hardcoded mapping.
+  user-editable mapping in the settings dialog, persisted to a file.
+- **Joystick button mapping in the settings UI** — the underlying
+  binding already lives in `settings.ini`'s `[Joystick]` section; the
+  remaining work is just the UI tab.
 - **BASIC-aware debugger panes** — program lister with de-tokenised
   output, current-line indicator, variable-table reader.
 - **Current-line highlighting** in the source view once the BASIC
@@ -226,9 +229,6 @@ Items I'd like to come back to (rough priority order):
   breakpoint list across runs (in `settings.ini`).
 - **BASIC source editor pane** — read the live BASIC program out of
   RAM, render it in an editable text pane, and write edits back.
-- **Settings dialog** — replace direct `settings.ini` editing with a
-  tabbed UI once there are enough groups to justify it (sound, joystick
-  mapping, user-editable keyboard glyphs).
 - **Hotkeys for the remaining menu items.**
 
 ## Acknowledgements
