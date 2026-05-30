@@ -32,6 +32,19 @@ public sealed class JoystickInput
     private readonly JOYCAPS[] _caps = new JOYCAPS[2];
     private readonly bool[] _capsValid = new bool[2];
 
+    // PC gamepad button bitmask for each MZ-1X03 button. Defaults map
+    // physical button 0 → MZ SW1 and button 1 → MZ SW2 (the original
+    // hardcoded behaviour). Host re-applies these from settings.ini on
+    // load and whenever the user edits the mapping.
+    public uint Sw1ButtonMask { get; set; } = 1u << 0;
+    public uint Sw2ButtonMask { get; set; } = 1u << 1;
+
+    public void SetButtonIndices(int sw1Index, int sw2Index)
+    {
+        Sw1ButtonMask = (sw1Index >= 0 && sw1Index <= 31) ? 1u << sw1Index : 0u;
+        Sw2ButtonMask = (sw2Index >= 0 && sw2Index <= 31) ? 1u << sw2Index : 0u;
+    }
+
     public JoystickInput(Joystick joystick) { _joystick = joystick; }
 
     public void Poll()
@@ -59,7 +72,7 @@ public sealed class JoystickInput
         wYmin = 0, wYmax = 65535,
     };
 
-    private static void ApplyToStick(Joystick.StickState s, JOYINFOEX info, JOYCAPS caps)
+    private void ApplyToStick(Joystick.StickState s, JOYINFOEX info, JOYCAPS caps)
     {
         s.Active = true;
 
@@ -78,8 +91,8 @@ public sealed class JoystickInput
         s.AxisX = MapWithDpad(info.dwXpos, caps.wXmin, caps.wXmax, povLeft, povRight, invert: false);
         s.AxisY = MapWithDpad(info.dwYpos, caps.wYmin, caps.wYmax, povUp,   povDown,  invert: false);
 
-        s.Sw1 = (info.dwButtons & 0x01) != 0;
-        s.Sw2 = (info.dwButtons & 0x02) != 0;
+        s.Sw1 = (info.dwButtons & Sw1ButtonMask) != 0;
+        s.Sw2 = (info.dwButtons & Sw2ButtonMask) != 0;
     }
 
     private static byte MapWithDpad(uint pos, uint min, uint max, bool low, bool high, bool invert)

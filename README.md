@@ -145,6 +145,11 @@ Scale=2
 Monitor=roms\1z-013a.rom
 Font=roms\mz700fon.int
 Basic=basic\1Z-013B.mzf
+
+[Joystick]
+; PC gamepad button index (0..31) that drives each MZ-1X03 stick button.
+Button1=0
+Button2=1
 ```
 
 Paths are written relative to the executable when possible (so the

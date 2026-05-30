@@ -34,6 +34,7 @@ public sealed class MainForm : Form
         _autoLoadBasic = autoLoadBasic;
         _dumpPath = dumpPath;
         _joystickInput = new Hardware.JoystickInput(_machine.Joystick);
+        _joystickInput.SetButtonIndices(_settings.JoyButton1Index, _settings.JoyButton2Index);
 
         Text = "Sharp MZ-700 Emulator";
         KeyPreview = true;

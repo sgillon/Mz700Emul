@@ -32,6 +32,15 @@ public sealed class Settings
     public string FontPath { get; set; } = "";
     public string BasicPath { get; set; } = "";
 
+    // PC gamepad button index (0..31, matching the WinMM dwButtons
+    // bitmask) that drives each MZ-1X03 stick button. Defaults match
+    // the original hardcoded behaviour: button 0 → MZ SW1, button 1
+    // → MZ SW2. Both emulated sticks share the same mapping; if you
+    // need per-slot mappings, this can be split into JoyStick1Button1
+    // etc. later without breaking the existing keys.
+    public int JoyButton1Index { get; set; } = 0;
+    public int JoyButton2Index { get; set; } = 1;
+
     public string MonitorRomFullPath => Resolve(MonitorRomPath);
     public string FontFullPath => Resolve(FontPath);
     public string BasicFullPath => Resolve(BasicPath);
@@ -43,6 +52,7 @@ public sealed class Settings
     {
         var s = new Settings();
         bool fileExisted = File.Exists(FilePath);
+        bool missingSection = false;
         try
         {
             if (fileExisted)
@@ -52,6 +62,12 @@ public sealed class Settings
                 s.MonitorRomPath = GetString(ini, "Roms", "Monitor", "");
                 s.FontPath = GetString(ini, "Roms", "Font", "");
                 s.BasicPath = GetString(ini, "Roms", "Basic", "");
+                s.JoyButton1Index = GetInt(ini, "Joystick", "Button1", s.JoyButton1Index);
+                s.JoyButton2Index = GetInt(ini, "Joystick", "Button2", s.JoyButton2Index);
+                // Older settings.ini files predate sections added in later
+                // versions. Flag any missing section so Save() runs once
+                // and the user gets a complete, editable file.
+                if (!ini.ContainsKey("Joystick")) missingSection = true;
             }
         }
         catch { /* fall through to defaults */ }
@@ -60,7 +76,7 @@ public sealed class Settings
         // file. On the very first run this populates all three; on later
         // runs it self-heals if the user moved files around.
         bool dirty = s.EnsureRomPaths();
-        if (dirty || !fileExisted) s.Save();
+        if (dirty || !fileExisted || missingSection) s.Save();
         return s;
     }
 
@@ -78,6 +94,11 @@ public sealed class Settings
             sb.AppendLine($"Monitor={MonitorRomPath}");
             sb.AppendLine($"Font={FontPath}");
             sb.AppendLine($"Basic={BasicPath}");
+            sb.AppendLine();
+            sb.AppendLine("[Joystick]");
+            sb.AppendLine("; PC gamepad button index (0..31) that drives each MZ-1X03 stick button.");
+            sb.AppendLine($"Button1={JoyButton1Index}");
+            sb.AppendLine($"Button2={JoyButton2Index}");
             File.WriteAllText(FilePath, sb.ToString());
         }
         catch { /* non-fatal */ }
@@ -86,6 +107,8 @@ public sealed class Settings
     private void Sanitize()
     {
         if (DisplayScale < 1 || DisplayScale > 3) DisplayScale = 2;
+        if (JoyButton1Index < 0 || JoyButton1Index > 31) JoyButton1Index = 0;
+        if (JoyButton2Index < 0 || JoyButton2Index > 31) JoyButton2Index = 1;
     }
 
     /// <summary>
