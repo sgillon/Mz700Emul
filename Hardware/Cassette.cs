@@ -81,6 +81,7 @@ public sealed class Cassette
 
     public MZ700Memory Memory = null!;
     public Z80Cpu Cpu = null!;
+    public Keyboard Keyboard = null!;
 
     public event Action<string>? OnLoaded;
     public event Action<string>? OnSaved;
@@ -225,19 +226,23 @@ public sealed class Cassette
         {
             // Monitor's "press PLAY / check BREAK" wait. With no physical tape
             // and large PIT periods, the natural timeout can take many seconds
-            // under our emulation. Normally short-circuit to the "no break, no
-            // timeout error" path (CY=0). This is correct both for cassette
-            // LOAD and for BASIC's periodic break polls.
+            // under our emulation. Short-circuit it, returning CY=1 if the
+            // user is actually holding the BREAK key (matrix (8,5), driven
+            // by PC Esc via SpecialKeyMap) and CY=0 otherwise — that's what
+            // a real MZ-700 would report on a normal LOAD with no break held,
+            // and what BASIC needs to honour the user's Esc when polling for
+            // break during a RUN.
             //
-            // Special case: once a SAVE has been committed, return CY=1
-            // (BREAK pressed) so BASIC abandons its tape-write loop and
-            // returns to Ready. Without this BASIC keeps generating tape
-            // signal forever — there's no real tape to acknowledge.
+            // Special case: once a SAVE has been committed, force CY=1 so
+            // BASIC abandons its tape-write loop and returns to Ready —
+            // there's no real tape to acknowledge so it would otherwise
+            // generate tape signal forever.
             BreakWaitTrapHits++;
-            if (_saveCommittedThisAttempt)
-                Cpu.F |= 0x01;   // CY=1 (BREAK)
+            bool breakHeld = _saveCommittedThisAttempt || IsBreakHeld();
+            if (breakHeld)
+                Cpu.F |= 0x01;
             else
-                Cpu.F &= 0xFE;   // CY=0 (no break)
+                Cpu.F &= 0xFE;
             Cpu.PC = PopFromStack();
             return true;
         }
@@ -297,6 +302,11 @@ public sealed class Cassette
     {
         _saveCommittedThisAttempt = false;
     }
+
+    // BREAK lives on matrix (8, 5) — strobe 8, column 5. Active low, so a
+    // held key reads as 0 in that bit. SpecialKeyMap binds Esc to this
+    // position; this helper is what makes the BreakWait trap honour it.
+    private bool IsBreakHeld() => (Keyboard.ReadRow(8) & (1 << 5)) == 0;
 
     /// <summary>
     /// One-shot diagnostic that writes the bytes at $0D40-$0D7F (BASIC's

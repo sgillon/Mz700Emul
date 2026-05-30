@@ -75,9 +75,21 @@ public static class CharMap
         // the MZ glyph at that position (e.g. UK Shift+3='£' → MZ '#').
         ['£'] = new(5, 5, true),  // UK Shift+3 → MZ Shift+3 position ('#')
         ['^'] = new(5, 2, true),  // UK Shift+6 → MZ Shift+6 position ('&')
-        ['*'] = new(5, 0, true),  // UK Shift+8 → MZ Shift+8 position
         ['<'] = new(6, 1, true),  // UK Shift+, → MZ Shift+, position
         ['>'] = new(6, 0, true),  // UK Shift+. → MZ Shift+. position
+
+        // Asterisk lives on shift-colon on the MZ-700 (verified against
+        // ROM shifted table at $0C30: code $6B = `*` glyph). Previously
+        // mapped to (5,0) shifted which is MZ shift-8 and produces `(`.
+        ['*'] = new(0, 1, true),
+
+        // Square brackets and curly braces — row 1 of the matrix carries
+        // these alongside Y/Z (verified against ROM tables: unshifted $54
+        // / $52 = `[` / `]`; shifted $40 / $BC = `{` / `}`).
+        ['['] = new(1, 3, false),
+        [']'] = new(1, 4, false),
+        ['{'] = new(1, 3, true),
+        ['}'] = new(1, 4, true),
 
         // Punctuation. Positions chosen by the GLYPH the MZ-700 produces
         // at that matrix slot, not by ASCII alignment.

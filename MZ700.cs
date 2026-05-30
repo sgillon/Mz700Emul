@@ -57,6 +57,7 @@ public sealed class MZ700
         Keyboard.Memory = Mem;
         Cassette.Memory = Mem;
         Cassette.Cpu = Cpu;
+        Cassette.Keyboard = Keyboard;
         Io.Joystick = Joystick;
         Joystick.Cpu = Cpu;
         Cpu.PreStep = Cassette.OnPreStep;
