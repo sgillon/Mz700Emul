@@ -554,6 +554,9 @@ public sealed class MainForm : Form
         var files = (string[]?)e.Data.GetData(DataFormats.FileDrop);
         if (files == null || files.Length == 0) return;
         LoadCassetteFile(files[0]);
+        // The drag originates from another window (Explorer, etc.), so focus
+        // stays with the source unless we explicitly grab it back.
+        Activate();
     }
 
     private void BrowseAndLoad()
