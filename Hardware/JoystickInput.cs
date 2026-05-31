@@ -47,6 +47,19 @@ public sealed class JoystickInput
 
     public JoystickInput(Joystick joystick) { _joystick = joystick; }
 
+    /// <summary>
+    /// Returns the raw button bitmask currently reported by joystick
+    /// <paramref name="slot"/> (0 or 1), or 0 if the slot is unplugged
+    /// or WinMM is unavailable. Used by the Settings dialog's "Capture
+    /// button" flow to let the user press a controller button rather
+    /// than type a numeric index.
+    /// </summary>
+    public uint GetCurrentButtons(uint slot)
+    {
+        if (slot >= 2 || !_winmmAvailable) return 0;
+        return TryGetState(slot, out var info) ? info.dwButtons : 0;
+    }
+
     public void Poll()
     {
         if (!_winmmAvailable) return;

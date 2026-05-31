@@ -39,6 +39,14 @@
     <None Remove="Z80Core/**/*" />
   </ItemGroup>
 
+  <!-- Hardware reference images shown in the Settings dialog. Embedded so
+       the single-file publish stays self-contained (no sidecar PNGs to
+       distribute). Only the JPG/PNG family is embedded; other content in
+       _hardwareimages/ stays out of the build. -->
+  <ItemGroup>
+    <EmbeddedResource Include="_hardwareimages\*.png" />
+  </ItemGroup>
+
   <!-- Copyrighted ROM / BASIC images are NOT shipped with this project.
        Users must supply their own copies under roms\ and basic\ next to
        the source tree (or next to the published executable); Settings.cs

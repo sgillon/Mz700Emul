@@ -125,6 +125,7 @@ ROMs / BASIC alongside the exe per [Quickstart](#quickstart).
 | Load BASIC | Ctrl+B |
 | Load BASIC source… | Ctrl+Shift+B |
 | Reset | Ctrl+R |
+| Settings… | Ctrl+S |
 | Display 1× / 2× / 3× | Ctrl+1 / Ctrl+2 / Ctrl+3 |
 | Debugger… | Ctrl+D |
 | Memory Viewer… | Ctrl+M |
@@ -134,8 +135,9 @@ the window. Loading a cassette resets the emulator first, so opening
 a different program mid-execution Just Works regardless of whether the
 old or new program is BASIC or machine code.
 
-User preferences live in `settings.ini` next to the executable — a
-plain INI file you can edit by hand if you prefer:
+User preferences live in `settings.ini` next to the executable.
+**File → Settings…** (Ctrl+S) opens a tabbed dialog covering Display,
+ROMs, and Joystick — or you can edit the INI by hand if you prefer:
 
 ```ini
 [Display]
@@ -212,15 +214,14 @@ games/           Joystick test program (joytest.bas / .mzf)
 
 Items I'd like to come back to (rough priority order):
 
-- **Tabbed settings dialog** — replace direct `settings.ini` editing
-  with a Ctrl+, dialog covering Display, ROMs, and Joystick to start.
-  Lays the groundwork for the next two items, which are awkward to
-  express in INI.
 - **Keyboard-map GUI editor** — expose the PC→MZ character map as a
   user-editable mapping in the settings dialog, persisted to a file.
-- **Joystick button mapping in the settings UI** — the underlying
-  binding already lives in `settings.ini`'s `[Joystick]` section; the
-  remaining work is just the UI tab.
+  Slots into the settings dialog scaffolding (Ctrl+S) introduced for
+  Display / ROMs / Joystick.
+- **Direct-jump shortcuts to settings tabs** — once the settings UI
+  gets busier, add menu entries that open the dialog already focused
+  on a specific tab (e.g. *Settings → Joystick…*) so users don't have
+  to navigate inside.
 - **BASIC-aware debugger panes** — program lister with de-tokenised
   output, current-line indicator, variable-table reader.
 - **Current-line highlighting** in the source view once the BASIC

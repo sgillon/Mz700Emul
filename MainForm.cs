@@ -119,6 +119,8 @@ public sealed class MainForm : Form
         file.DropDownItems.Add(new ToolStripSeparator());
         file.DropDownItems.Add(new ToolStripMenuItem("&Reset", null, (_, _) => ResetMachine()) { ShortcutKeys = Keys.Control | Keys.R });
         file.DropDownItems.Add(new ToolStripSeparator());
+        file.DropDownItems.Add(new ToolStripMenuItem("&Settings…", null, (_, _) => OpenSettings()) { ShortcutKeys = Keys.Control | Keys.S });
+        file.DropDownItems.Add(new ToolStripSeparator());
         file.DropDownItems.Add(new ToolStripMenuItem("E&xit", null, (_, _) => Close()));
         menu.Items.Add(file);
 
@@ -724,6 +726,24 @@ public sealed class MainForm : Form
         _monitorReady = false;
         _basicLoadedFrame = -1;
         _statusLabel.Text = "Reset.";
+    }
+
+    private void OpenSettings()
+    {
+        using var dlg = new SettingsForm(_settings, _joystickInput);
+        dlg.Applied += OnSettingsApplied;
+        dlg.ShowDialog(this);
+    }
+
+    private void OnSettingsApplied()
+    {
+        // Display scale change: re-size the client area and update the
+        // View menu's checked state. ApplyDisplayScale is a no-op if the
+        // value didn't actually change.
+        ApplyDisplayScale(_settings.DisplayScale);
+        // Joystick button bindings can be re-pushed live; ROM paths take
+        // effect on the next Reset, so we don't touch the running machine.
+        _joystickInput.SetButtonIndices(_settings.JoyButton1Index, _settings.JoyButton2Index);
     }
 
     private void OpenDebugger()
