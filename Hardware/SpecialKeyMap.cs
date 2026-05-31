@@ -4,10 +4,15 @@ using System.Windows.Forms;
 namespace MZ700Emul.Hardware;
 
 /// <summary>
-/// PC virtual-key → MZ-700 matrix position for keys that don't produce a
-/// printable character (cursor keys, function keys, Enter, Esc, Backspace,
-/// Insert, MZ Ctrl). These are handled directly in OnKeyDown — they don't
-/// fire WinForms KeyPress, so the char-driven path can't see them.
+/// Built-in defaults: PC virtual-key → MZ-700 matrix position for keys
+/// that don't produce a printable character (cursor keys, function keys,
+/// Enter, Esc, Backspace, Insert, MZ Ctrl, ALPHA / GRAPH mode keys).
+/// These are handled directly in <see cref="Keyboard.OnKeyDown"/> — they
+/// don't fire WinForms KeyPress, so the char-driven path can't see them.
+///
+/// Users can override any of these via <see cref="KeyOverride"/>, which
+/// is consulted first. SpecialKeyMap entries are bare VKs only — modifier
+/// combinations live in the override layer.
 /// </summary>
 public static class SpecialKeyMap
 {
@@ -28,11 +33,30 @@ public static class SpecialKeyMap
         // shifted BREAK is required to stop a program, which matches the
         // bit-0 + bit-7 combination exactly.
         [Keys.Escape]      = (8, 7),
+        // MZ Ctrl on left Ctrl only. Right Ctrl is repurposed for ALPHA
+        // (mode-key) below, mirroring the MZ-700's grouping of GRAPH /
+        // ALPHA / CTRL together as modal keys.
         [Keys.LControlKey] = (9, 2),
-        [Keys.RControlKey] = (9, 2),
         [Keys.F1]          = (9, 7),
         [Keys.F2]          = (9, 6),
         [Keys.F3]          = (9, 5),
         [Keys.F4]          = (9, 4),
+        // MZ-700 mode-toggle keys (page 142 of the owner's manual lists
+        // GRAPH and ALPHA on row 1 — our row 0 — at D6 and D4 respectively).
+        // GRAPH puts the machine in graphic-char input mode; ALPHA returns
+        // to alphanumeric. Both are normal matrix keys from a hardware
+        // perspective; the ROM holds the mode state and flips it on the
+        // press edge.
+        //
+        // Initial plan was AltGr / Right Ctrl, but the diagnostic loop
+        // revealed WinForms normalises Left/Right VKs to the generic form
+        // (RMenu → Menu, RControlKey → ControlKey) — and AltGr emits a
+        // synthetic LCtrl on Windows that would briefly assert MZ Ctrl.
+        // Switched to F11/F12 as unambiguous defaults; the override layer
+        // can rebind to anything. Note: F11 conflicts with the conventional
+        // full-screen toggle — if/when full-screen lands we'll either move
+        // it to Alt+Enter or rebind GRAPH.
+        [Keys.F11]         = (0, 6),  // F11 → GRAPH
+        [Keys.F12]         = (0, 4),  // F12 → ALPHA
     };
 }

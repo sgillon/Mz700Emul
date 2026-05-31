@@ -31,6 +31,11 @@ public sealed class Keyboard
     // shortcut shifted alphanumerics would be unreachable.
     public MZ700Memory? Memory;
 
+    // User-editable physical-key overrides, consulted before SpecialKeyMap
+    // and CharMap in OnKeyDown. Null = no overrides loaded; behaviour
+    // matches pre-layered code.
+    public KeyOverride? Overrides;
+
     // True PC shift state; tracked so KeyUp can recompute the MZ shift
     // bit after a char-driven hold ends.
     private bool _pcShift;
@@ -116,26 +121,54 @@ public sealed class Keyboard
 
     /// <summary>
     /// PC KeyDown. Returns true if the form should consider the event
-    /// handled. For printable keys we defer to OnKeyPress (which has the
-    /// resolved Unicode char); for special keys we drive the matrix here.
+    /// handled. <paramref name="keyData"/> is the WinForms combined
+    /// VK + modifier flags (e.g. <c>Control | G</c>) so the override
+    /// layer can match modifier-aware bindings; the bare VK is used as
+    /// the <see cref="_holds"/> key so KeyUp's bare VK still matches.
+    ///
+    /// Layered lookup order:
+    ///   1. <see cref="Overrides"/> — user-editable physical-key map,
+    ///      modifier-aware (combined key wins over bare).
+    ///   2. <see cref="SpecialKeyMap"/> — built-in non-character keys
+    ///      (cursors, F-keys, Enter, Esc, GRAPH, ALPHA, MZ Ctrl).
+    ///   3. Defer to <see cref="OnKeyPress"/> for printables, which
+    ///      consults <see cref="CharMap"/> with the resolved Unicode
+    ///      character so host keyboard layout / AltGr / dead keys all
+    ///      work transparently.
     /// </summary>
-    public bool OnKeyDown(Keys vk, bool pcShift)
+    public bool OnKeyDown(Keys keyData, bool pcShift)
     {
         _pcShift = pcShift;
-        if (_holds.ContainsKey(vk)) return true; // auto-repeat: bit already held
+        var bareVk = keyData & Keys.KeyCode;
+        if (_holds.ContainsKey(bareVk)) return true; // auto-repeat: bit already held
 
-        if (SpecialKeyMap.Map.TryGetValue(vk, out var rc))
+        // Layer 1: user overrides. MzShift can be true/false/null and the
+        // ActiveHold honours each — see EffectiveMzShift's null check.
+        var ov = Overrides?.Resolve(keyData);
+        if (ov.HasValue)
+        {
+            var b = ov.Value;
+            _holds[bareVk] = new ActiveHold(b.Row, b.Col, b.MzShift);
+            SetMatrix(b.Row, b.Col, true);
+            SetMatrix(8, 0, EffectiveMzShift());
+            if (Memory != null && b.MzShift.HasValue)
+                Memory.Ram[0x1170] = (byte)(b.MzShift.Value ? 0x01 : 0x00);
+            return true;
+        }
+
+        // Layer 2: built-in defaults (bare VK only).
+        if (SpecialKeyMap.Map.TryGetValue(bareVk, out var rc))
         {
             // Non-printable: drive matrix directly, pass PC shift through
             // (no explicit shift requirement on this hold).
-            _holds[vk] = new ActiveHold(rc.row, rc.col, ExplicitMzShift: null);
+            _holds[bareVk] = new ActiveHold(rc.row, rc.col, ExplicitMzShift: null);
             SetMatrix(rc.row, rc.col, true);
             SetMatrix(8, 0, EffectiveMzShift());
             return true;
         }
 
-        // Printable: park the VK and wait for KeyPress to deliver the char.
-        _pendingDownVk = vk;
+        // Layer 3: defer to KeyPress for character-driven mapping.
+        _pendingDownVk = bareVk;
         return false;
     }
 
@@ -163,17 +196,20 @@ public sealed class Keyboard
     /// <summary>
     /// PC KeyUp. Releases whichever matrix bits this VK's KeyDown
     /// asserted, then recomputes the MZ shift bit from remaining holds
-    /// and the user's actual PC shift state.
+    /// and the user's actual PC shift state. <paramref name="keyData"/>
+    /// is the combined VK + modifiers; the bare VK is what's keyed in
+    /// <see cref="_holds"/>.
     /// </summary>
-    public bool OnKeyUp(Keys vk, bool pcShift)
+    public bool OnKeyUp(Keys keyData, bool pcShift)
     {
         _pcShift = pcShift;
-        if (_pendingDownVk == vk) _pendingDownVk = Keys.None;
+        var bareVk = keyData & Keys.KeyCode;
+        if (_pendingDownVk == bareVk) _pendingDownVk = Keys.None;
 
-        if (!_holds.TryGetValue(vk, out var h)) return false;
+        if (!_holds.TryGetValue(bareVk, out var h)) return false;
 
         SetMatrix(h.Row, h.Col, false);
-        _holds.Remove(vk);
+        _holds.Remove(bareVk);
 
         // Recompute MZ shift from remaining holds + PC state.
         bool effective = EffectiveMzShift();

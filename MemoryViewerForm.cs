@@ -33,7 +33,16 @@ public sealed class MemoryViewerForm : Form
     private readonly TextBox _dumpStart = new();
     private readonly TextBox _dumpEnd = new();
     private readonly Button _btnDump = new();
+    private readonly Button _btnSnap = new() { Text = "Snap", Width = 50, Height = 28, TabStop = false };
+    private readonly Button _btnDiff = new() { Text = "Diff…", Width = 56, Height = 28, TabStop = false, Enabled = false };
+    private readonly Button _btnClearSnap = new() { Text = "✕", Width = 28, Height = 28, TabStop = false, Enabled = false };
     private readonly SmoothLabel _statusLabel = new();
+
+    // Snapshot/Diff state. Null means "no snapshot". When non-null, the
+    // OnDrawRow callback marks changed bytes with a small underline so the
+    // user sees diffs at a glance; the Diff… popup lists them explicitly.
+    private byte[]? _snapshot;
+    private DateTime _snapshotTime;
 
     private readonly Font _mono;
 
@@ -114,10 +123,19 @@ public sealed class MemoryViewerForm : Form
         _btnDump.TabStop = false;
         _btnDump.Click += (_, _) => DoDump();
 
+        var snapSep = new Label { Text = "  ", AutoSize = true, Margin = new Padding(8, 7, 0, 0) };
+        _btnSnap.Margin = new Padding(0, 3, 2, 0);
+        _btnDiff.Margin = new Padding(0, 3, 2, 0);
+        _btnClearSnap.Margin = new Padding(0, 3, 2, 0);
+        _btnSnap.Click += (_, _) => TakeSnapshot();
+        _btnDiff.Click += (_, _) => ShowDiff();
+        _btnClearSnap.Click += (_, _) => ClearSnapshot();
+
         toolbar.Controls.AddRange(new Control[]
         {
             lbl, _gotoAddr, _btnGoto, btnPC, btnSP,
             sep, _dumpStart, dash, _dumpEnd, _btnDump,
+            snapSep, _btnSnap, _btnDiff, _btnClearSnap,
         });
         root.Controls.Add(toolbar, 0, 0);
 
@@ -319,6 +337,20 @@ public sealed class MemoryViewerForm : Form
         {
             if (isPCRow) MarkByte(e.Graphics, e.Bounds, _machine.Cpu.PC - rowAddr, Color.OrangeRed);
             if (isSPRow) MarkByte(e.Graphics, e.Bounds, _machine.Cpu.SP - rowAddr, Color.RoyalBlue);
+
+            // Diff markers: per-byte underline anywhere a snapshot byte
+            // disagrees with the current value. Lets the user spot
+            // toggles at a glance while scrolling.
+            if (_snapshot != null)
+            {
+                for (int i = 0; i < BytesPerRow; i++)
+                {
+                    ushort a = (ushort)(rowAddr + i);
+                    if (IsIoWindow(a)) continue;
+                    if (_rowBytes[i] != _snapshot[a])
+                        MarkByte(e.Graphics, e.Bounds, i, Color.MediumVioletRed);
+                }
+            }
         }
     }
 
@@ -374,4 +406,78 @@ public sealed class MemoryViewerForm : Form
         }
     }
 
+    // --- Snapshot / Diff ----------------------------------------------------
+    //
+    // General-purpose memory diff. Press Snap, change something in the
+    // emulator (press a key, move in a game, wait for a state transition),
+    // press Diff to see exactly which bytes changed. Useful for the GRAPH/
+    // ALPHA mode-flag hunt today and for cheat-finding workflows generally.
+    //
+    // Pages $E000-$E00F (PPI/PIT I/O window) are excluded from the diff
+    // because reads there have hardware side effects and noise.
+
+    private void TakeSnapshot()
+    {
+        _snapshot ??= new byte[0x10000];
+        for (int a = 0; a < 0x10000; a++)
+            _snapshot[a] = IsIoWindow((ushort)a) ? (byte)0 : _machine.Mem.Read((ushort)a);
+        _snapshotTime = DateTime.Now;
+        _btnDiff.Enabled = true;
+        _btnClearSnap.Enabled = true;
+        SetTextIfChanged(_statusLabel, $"Snapshot taken @ {_snapshotTime:HH:mm:ss}.");
+        _list.Invalidate();
+    }
+
+    private void ClearSnapshot()
+    {
+        _snapshot = null;
+        _btnDiff.Enabled = false;
+        _btnClearSnap.Enabled = false;
+        SetTextIfChanged(_statusLabel, "Snapshot cleared.");
+        _list.Invalidate();
+    }
+
+    private void ShowDiff()
+    {
+        if (_snapshot == null) return;
+        var diffs = new List<(ushort addr, byte snap, byte cur)>();
+        for (int a = 0; a < 0x10000; a++)
+        {
+            if (IsIoWindow((ushort)a)) continue;
+            byte cur = _machine.Mem.Read((ushort)a);
+            if (cur != _snapshot[a]) diffs.Add(((ushort)a, _snapshot[a], cur));
+        }
+
+        using var dlg = new Form
+        {
+            Text = $"Diff vs snapshot @ {_snapshotTime:HH:mm:ss} — {diffs.Count} byte{(diffs.Count == 1 ? "" : "s")} changed",
+            ClientSize = new Size(340, 480),
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.SizableToolWindow,
+            ShowInTaskbar = false,
+            MinimizeBox = false,
+            MaximizeBox = false,
+        };
+        var hint = new Label
+        {
+            Text = "Double-click an entry to jump there.",
+            Dock = DockStyle.Top,
+            Height = 22,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Padding = new Padding(6, 0, 0, 0),
+            ForeColor = SystemColors.GrayText,
+        };
+        var list = new ListBox { Dock = DockStyle.Fill, Font = _mono, IntegralHeight = false };
+        foreach (var d in diffs)
+            list.Items.Add($"${d.addr:X4}: {d.snap:X2} → {d.cur:X2}");
+        list.DoubleClick += (_, _) =>
+        {
+            if (list.SelectedIndex < 0 || list.SelectedIndex >= diffs.Count) return;
+            ScrollTo(diffs[list.SelectedIndex].addr);
+            dlg.Close();
+        };
+        dlg.Controls.Add(list);
+        dlg.Controls.Add(hint);
+        dlg.ShowDialog(this);
+    }
 }

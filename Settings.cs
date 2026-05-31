@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using MZ700Emul.Hardware;
 
 namespace MZ700Emul;
 
@@ -41,6 +42,11 @@ public sealed class Settings
     public int JoyButton1Index { get; set; } = 0;
     public int JoyButton2Index { get; set; } = 1;
 
+    // User-editable physical-key overrides. Empty by default; built-in
+    // defaults (Enter, arrows, GRAPH, ALPHA, ...) live in SpecialKeyMap.
+    // Anything in here is consulted FIRST by Keyboard.OnKeyDown.
+    public KeyOverride KeyOverrides { get; } = new();
+
     public string MonitorRomFullPath => Resolve(MonitorRomPath);
     public string FontFullPath => Resolve(FontPath);
     public string BasicFullPath => Resolve(BasicPath);
@@ -64,10 +70,15 @@ public sealed class Settings
                 s.BasicPath = GetString(ini, "Roms", "Basic", "");
                 s.JoyButton1Index = GetInt(ini, "Joystick", "Button1", s.JoyButton1Index);
                 s.JoyButton2Index = GetInt(ini, "Joystick", "Button2", s.JoyButton2Index);
+                if (ini.TryGetValue("KeyOverrides", out var ko))
+                {
+                    foreach (var kv in ko) s.KeyOverrides.TryParseLine(kv.Key, kv.Value);
+                }
                 // Older settings.ini files predate sections added in later
                 // versions. Flag any missing section so Save() runs once
                 // and the user gets a complete, editable file.
                 if (!ini.ContainsKey("Joystick")) missingSection = true;
+                if (!ini.ContainsKey("KeyOverrides")) missingSection = true;
             }
         }
         catch { /* fall through to defaults */ }
@@ -99,6 +110,15 @@ public sealed class Settings
             sb.AppendLine("; PC gamepad button index (0..31) that drives each MZ-1X03 stick button.");
             sb.AppendLine($"Button1={JoyButton1Index}");
             sb.AppendLine($"Button2={JoyButton2Index}");
+            sb.AppendLine();
+            sb.AppendLine("[KeyOverrides]");
+            sb.AppendLine("; User physical-key bindings. One line per binding:");
+            sb.AppendLine(";   <KeyName>=<row>,<col>,<shift>");
+            sb.AppendLine("; KeyName: WinForms Keys enum, e.g. F5, Tab, 'Control, G'.");
+            sb.AppendLine("; row 0-9, col 0-7 = MZ-700 matrix position.");
+            sb.AppendLine("; shift: t = force MZ shift on, f = force off, - = pass through PC shift.");
+            sb.AppendLine("; Overrides win over the built-in defaults in SpecialKeyMap/CharMap.");
+            foreach (var line in KeyOverrides.SerialiseLines()) sb.AppendLine(line);
             File.WriteAllText(FilePath, sb.ToString());
         }
         catch { /* non-fatal */ }

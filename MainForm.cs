@@ -15,6 +15,14 @@ public sealed class MainForm : Form
     private readonly StatusStrip _status = new();
     private readonly ToolStripStatusLabel _statusLabel = new();
     private readonly ToolStripStatusLabel _joyStatus = new() { Spring = false };
+    private readonly ToolStripStatusLabel _modeLabel = new()
+    {
+        Spring = false,
+        Text = "ALPHA",
+        AutoSize = false,
+        Width = 56,
+        TextAlign = ContentAlignment.MiddleCenter,
+    };
     private readonly PictureBox _display = new();
     private readonly Settings _settings = Settings.Load();
     private readonly ToolStripMenuItem[] _scaleMenuItems = new ToolStripMenuItem[3];
@@ -35,6 +43,7 @@ public sealed class MainForm : Form
         _dumpPath = dumpPath;
         _joystickInput = new Hardware.JoystickInput(_machine.Joystick);
         _joystickInput.SetButtonIndices(_settings.JoyButton1Index, _settings.JoyButton2Index);
+        _machine.Keyboard.Overrides = _settings.KeyOverrides;
 
         Text = "Sharp MZ-700 Emulator";
         KeyPreview = true;
@@ -63,6 +72,7 @@ public sealed class MainForm : Form
         _statusLabel.TextAlign = ContentAlignment.MiddleLeft;
         _status.Items.Add(_statusLabel);
         _status.Items.Add(_joyStatus);
+        _status.Items.Add(_modeLabel);
         _statusLabel.Text = "Ready.";
         _joyStatus.Text = "Joy: --";
 
@@ -293,6 +303,38 @@ public sealed class MainForm : Form
                     ? $"{n}[X{s.AxisX:D3} Y{s.AxisY:D3}{(s.Sw1 ? " A" : "")}{(s.Sw2 ? " B" : "")}]"
                     : $"{n}-";
             _joyStatus.Text = $"Joy: {Fmt(s0, 1)} {Fmt(s1, 2)}";
+
+            // S-BASIC's keyboard mode flag, discovered empirically via the
+            // memory-viewer snapshot/diff tool 2026-05-31: bit 4 of $0060
+            // set = GRAPH mode, cleared = ALPHA. Only meaningful while
+            // S-BASIC owns the machine (ROM banked out so $0060 is RAM);
+            // before BASIC is loaded, $0060 reads from ROM and the
+            // indicator would be misleading, so we grey it out with "—".
+            if (_basicLoadedFrame < 0)
+            {
+                if (_modeLabel.Text != "—")
+                {
+                    _modeLabel.Text = "—";
+                    _modeLabel.ForeColor = SystemColors.GrayText;
+                    _modeLabel.BackColor = SystemColors.Control;
+                }
+            }
+            else
+            {
+                bool graph = (_machine.Mem.Read(0x0060) & 0x10) != 0;
+                if (graph && _modeLabel.Text != "GRAPH")
+                {
+                    _modeLabel.Text = "GRAPH";
+                    _modeLabel.ForeColor = Color.White;
+                    _modeLabel.BackColor = Color.MediumVioletRed;
+                }
+                else if (!graph && _modeLabel.Text != "ALPHA")
+                {
+                    _modeLabel.Text = "ALPHA";
+                    _modeLabel.ForeColor = SystemColors.ControlText;
+                    _modeLabel.BackColor = SystemColors.Control;
+                }
+            }
         }
 
 
@@ -532,7 +574,10 @@ public sealed class MainForm : Form
         // also detect via the VK code itself.
         bool shift = e.Shift || IsShiftKey(e.KeyCode);
         _machine.Keyboard.SetShift(shift);
-        if (_machine.Keyboard.OnKeyDown(e.KeyCode, shift)) e.Handled = true;
+        // Pass KeyData (VK + modifier flags) so the override layer can
+        // match modifier-aware bindings; Keyboard internally strips
+        // modifiers when consulting SpecialKeyMap and managing holds.
+        if (_machine.Keyboard.OnKeyDown(e.KeyData, shift)) e.Handled = true;
     }
 
     private void OnKeyPress(object? s, KeyPressEventArgs e)
@@ -544,7 +589,7 @@ public sealed class MainForm : Form
     {
         bool shift = e.Shift && !IsShiftKey(e.KeyCode);
         _machine.Keyboard.SetShift(shift);
-        if (_machine.Keyboard.OnKeyUp(e.KeyCode, shift)) e.Handled = true;
+        if (_machine.Keyboard.OnKeyUp(e.KeyData, shift)) e.Handled = true;
     }
 
     private void OnDragEnter(object? s, DragEventArgs e)
