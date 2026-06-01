@@ -28,6 +28,11 @@ settings.ini
 # Local convenience scripts
 resumeproject.bat
 
+# Local working dirs — convention: any folder prefixed with '_' is
+# local-only (session artifacts, scratch dumps, downloaded reference
+# material). Never committed.
+_*/
+
 # other files
 .claude/
 
