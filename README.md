@@ -129,6 +129,7 @@ ROMs / BASIC alongside the exe per [Quickstart](#quickstart).
 | Display 1× / 2× / 3× | Ctrl+1 / Ctrl+2 / Ctrl+3 |
 | Debugger… | Ctrl+D |
 | Memory Viewer… | Ctrl+M |
+| HID Diagnostic… | Ctrl+H |
 
 You can also drag and drop an `.mzf` (or a `.zip` containing one) onto
 the window. Loading a cassette resets the emulator first, so opening
@@ -167,6 +168,8 @@ Topic-by-topic guides live under [`docs/usage/`](docs/usage/):
   view, disassembly pane, breakpoints.
 - [Memory viewer](docs/usage/memory-viewer.md) — live hex / ASCII view
   of the 64K address space with PC and SP highlighting.
+- [HID Diagnostic](docs/usage/hid-diagnostic.md) — live view of
+  host keyboard / joystick input and the resolved MZ-700 matrix state.
 - [Keyboard](docs/usage/keyboard.md) — how host keystrokes are mapped
   to the MZ-700 matrix; loading `.bas` source files.
 - [Joystick](docs/usage/joystick.md) — MZ-1X03 emulation driven from
@@ -192,6 +195,9 @@ DebuggerForm.cs  Debugger window (execution control, registers,
                  disassembly pane, breakpoints)
 MemoryViewerForm.cs  Hex / ASCII memory viewer (companion to the
                  debugger; PC / SP highlighting, live updates)
+HidDiagnosticForm.cs Live view of host input (keyboard / joystick),
+                 the mapping layer that matched, and the resolved
+                 MZ-700 keyboard matrix
 SmoothControls.cs    Double-buffered Label / ListBox / TableLayoutPanel
                  subclasses used by the debugger windows
 Settings.cs      INI-backed user preferences (settings.ini)
