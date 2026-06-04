@@ -46,6 +46,7 @@ public sealed class MainForm : Form
         _joystickInput = new Hardware.JoystickInput(_machine.Joystick);
         _joystickInput.SetButtonIndices(_settings.JoyButton1Index, _settings.JoyButton2Index);
         _machine.Keyboard.Overrides = _settings.KeyOverrides;
+        CharMap.Overrides = _settings.CharMapOverrides;
 
         Text = "Sharp MZ-700 Emulator";
         KeyPreview = true;

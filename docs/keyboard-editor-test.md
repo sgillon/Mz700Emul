@@ -58,7 +58,39 @@ honoured by `CharMap.TryLookup`).
 
 ## A4 — INI persistence and section retrofit
 
-*(to be added)*
+**File shape (run once, then inspect `settings.ini` next to the exe):**
+
+- [ ] All five sections present in order: `[Display]`, `[Roms]`,
+      `[Joystick]`, `[KeyOverrides]`, `[CharMap]`.
+- [ ] Every section has a comment block immediately under its header
+      describing its values, allowed ranges, and what each token means.
+      A fresh reader should understand the file without opening source
+      code.
+- [ ] `[KeyOverrides]` shift documents `t / f / -` (pass-through is
+      meaningful here); `[CharMap]` shift documents only `t / f`
+      (pass-through is explicitly noted as not applicable).
+
+**Override round-trip (manual edit, then restart):**
+
+- [ ] Add a single line to `[CharMap]`: `0061=6,0,f   ; 'a'` (rebinds
+      PC `a` to slot (6,0), which is `.`).
+- [ ] Restart the emulator and bring up the BASIC `READY` prompt.
+- [ ] Press `a` on the PC keyboard. A `.` (period) should appear at
+      the cursor, not `A`.
+- [ ] Remove the line from `[CharMap]` and restart. Pressing `a` now
+      produces `A` again (default behaviour restored).
+
+**Inline-comment safety:**
+
+- [ ] The `; 'a'` glyph comment on the override line does not break
+      parsing — the entry loads correctly.
+
+**Upgrade-from-older-INI check:**
+
+- [ ] Take an older `settings.ini` (e.g. from before A4) that lacks
+      the `[CharMap]` section. Launch. The file is rewritten with the
+      new comment blocks and `[CharMap]` present; existing values
+      (display scale, joystick buttons, key overrides) are preserved.
 
 ## A5 — KeyCaptureControl
 

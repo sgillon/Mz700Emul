@@ -47,6 +47,11 @@ public sealed class Settings
     // Anything in here is consulted FIRST by Keyboard.OnKeyDown.
     public KeyOverride KeyOverrides { get; } = new();
 
+    // User-editable character-map overrides. Empty by default; built-in
+    // defaults (letters, digits, common punctuation) live in CharMap.
+    // Anything in here is consulted FIRST by CharMap.TryLookup.
+    public CharMapOverrides CharMapOverrides { get; } = new();
+
     public string MonitorRomFullPath => Resolve(MonitorRomPath);
     public string FontFullPath => Resolve(FontPath);
     public string BasicFullPath => Resolve(BasicPath);
@@ -74,11 +79,17 @@ public sealed class Settings
                 {
                     foreach (var kv in ko) s.KeyOverrides.TryParseLine(kv.Key, kv.Value);
                 }
+                if (ini.TryGetValue("CharMap", out var cm))
+                {
+                    foreach (var kv in cm) s.CharMapOverrides.TryParseLine(kv.Key, kv.Value);
+                }
                 // Older settings.ini files predate sections added in later
                 // versions. Flag any missing section so Save() runs once
-                // and the user gets a complete, editable file.
+                // and the user gets a complete, editable file (now with the
+                // retrofitted self-documenting comment blocks).
                 if (!ini.ContainsKey("Joystick")) missingSection = true;
                 if (!ini.ContainsKey("KeyOverrides")) missingSection = true;
+                if (!ini.ContainsKey("CharMap")) missingSection = true;
             }
         }
         catch { /* fall through to defaults */ }
@@ -97,28 +108,78 @@ public sealed class Settings
         {
             var sb = new StringBuilder();
             sb.AppendLine("; MZ700 Emulator settings — edit by hand if you like.");
+            sb.AppendLine("; Every section's format is documented inline below; you shouldn't");
+            sb.AppendLine("; need to consult anything else to understand or tweak this file.");
             sb.AppendLine();
+
             sb.AppendLine("[Display]");
+            sb.AppendLine("; Window scale factor for the 320×200 MZ-700 framebuffer.");
+            sb.AppendLine(";   Scale=1   native 320×200");
+            sb.AppendLine(";   Scale=2   640×400 (default)");
+            sb.AppendLine(";   Scale=3   960×600");
             sb.AppendLine($"Scale={DisplayScale}");
             sb.AppendLine();
+
             sb.AppendLine("[Roms]");
+            sb.AppendLine("; Paths to the Sharp firmware files. Stored relative to MZ700Emul.exe");
+            sb.AppendLine("; when the file lives at-or-below it (portable installs), absolute");
+            sb.AppendLine("; otherwise. If a path goes stale (file moved or deleted) the next");
+            sb.AppendLine("; launch re-scans the standard locations and patches the entry up.");
+            sb.AppendLine(";   Monitor   1z-013a.rom   4 KiB monitor ROM");
+            sb.AppendLine(";   Font      mz700fon.int  character generator ROM");
+            sb.AppendLine(";   Basic     1Z-013B.mzf   S-BASIC cassette image");
             sb.AppendLine($"Monitor={MonitorRomPath}");
             sb.AppendLine($"Font={FontPath}");
             sb.AppendLine($"Basic={BasicPath}");
             sb.AppendLine();
+
             sb.AppendLine("[Joystick]");
-            sb.AppendLine("; PC gamepad button index (0..31) that drives each MZ-1X03 stick button.");
+            sb.AppendLine("; MZ-1X03 stick emulation driven by any Windows-recognised gamepad.");
+            sb.AppendLine("; Both emulated sticks share the same button mapping.");
+            sb.AppendLine(";   Button1   PC gamepad button index (0..31) that drives MZ SW1");
+            sb.AppendLine(";   Button2   PC gamepad button index (0..31) that drives MZ SW2");
+            sb.AppendLine("; Capture an index via Settings → Joystick → Capture… rather than guessing.");
             sb.AppendLine($"Button1={JoyButton1Index}");
             sb.AppendLine($"Button2={JoyButton2Index}");
             sb.AppendLine();
+
             sb.AppendLine("[KeyOverrides]");
-            sb.AppendLine("; User physical-key bindings. One line per binding:");
+            sb.AppendLine("; User physical-key bindings. Consulted ahead of the built-in");
+            sb.AppendLine("; SpecialKeyMap defaults (Enter, cursors, GRAPH/ALPHA, F-keys, etc).");
+            sb.AppendLine("; One line per binding:");
             sb.AppendLine(";   <KeyName>=<row>,<col>,<shift>");
-            sb.AppendLine("; KeyName: WinForms Keys enum, e.g. F5, Tab, 'Control, G'.");
-            sb.AppendLine("; row 0-9, col 0-7 = MZ-700 matrix position.");
-            sb.AppendLine("; shift: t = force MZ shift on, f = force off, - = pass through PC shift.");
-            sb.AppendLine("; Overrides win over the built-in defaults in SpecialKeyMap/CharMap.");
+            sb.AppendLine("; Where:");
+            sb.AppendLine(";   <KeyName>  WinForms Keys enum value, e.g. F5, Tab, 'Control, G'.");
+            sb.AppendLine(";   <row>      MZ-700 matrix row, 0-9.");
+            sb.AppendLine(";   <col>      MZ-700 matrix column, 0-7.");
+            sb.AppendLine(";   <shift>    MZ shift state to assert while the key is held:");
+            sb.AppendLine(";                t = force MZ shift on");
+            sb.AppendLine(";                f = force MZ shift off");
+            sb.AppendLine(";                - = pass through whatever PC shift is currently held");
             foreach (var line in KeyOverrides.SerialiseLines()) sb.AppendLine(line);
+            sb.AppendLine();
+
+            sb.AppendLine("[CharMap]");
+            sb.AppendLine("; User character-map overrides. Consulted ahead of the built-in");
+            sb.AppendLine("; CharMap defaults (letters, digits, punctuation). Drives the");
+            sb.AppendLine("; char-resolved keystroke path (after host-OS layout / AltGr).");
+            sb.AppendLine("; One line per binding:");
+            sb.AppendLine(";   <hex-codepoint>=<row>,<col>,<shift>   ; <glyph>");
+            sb.AppendLine("; Where:");
+            sb.AppendLine(";   <hex-codepoint>  Unicode codepoint of the PC char in 4-digit hex");
+            sb.AppendLine(";                    (e.g. 002A = '*'). Hex avoids breaking the INI");
+            sb.AppendLine(";                    parser on chars like '=', ';', '#'.");
+            sb.AppendLine(";   <row>            MZ-700 matrix row, 0-9.");
+            sb.AppendLine(";   <col>            MZ-700 matrix column, 0-7.");
+            sb.AppendLine(";   <shift>          MZ shift state to assert while the char fires:");
+            sb.AppendLine(";                      t = force MZ shift on");
+            sb.AppendLine(";                      f = force MZ shift off");
+            sb.AppendLine(";                    (Pass-through doesn't apply here — by the time");
+            sb.AppendLine(";                    we have a char, the OS has resolved the shift.)");
+            sb.AppendLine(";   <glyph>          Free-text comment showing the literal character,");
+            sb.AppendLine(";                    purely for hand-editing readability.");
+            foreach (var line in CharMapOverrides.SerialiseLines()) sb.AppendLine(line);
+
             File.WriteAllText(FilePath, sb.ToString());
         }
         catch { /* non-fatal */ }
@@ -252,7 +313,15 @@ public sealed class Settings
             }
             int eq = line.IndexOf('=');
             if (eq <= 0) continue;
-            current[line.Substring(0, eq).Trim()] = line.Substring(eq + 1).Trim();
+            var key = line.Substring(0, eq).Trim();
+            var value = line.Substring(eq + 1);
+            // Strip inline ';' comment from the value side (e.g. the
+            // glyph comment on a [CharMap] line). Values in our format
+            // never legitimately contain ';' — sections that need to
+            // would have to escape, but none currently do.
+            int comment = value.IndexOf(';');
+            if (comment >= 0) value = value.Substring(0, comment);
+            current[key] = value.Trim();
         }
         return result;
     }
