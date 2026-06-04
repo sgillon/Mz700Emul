@@ -1,4 +1,6 @@
+using System;
 using System.Drawing;
+using System.IO;
 using System.Text;
 using System.Windows.Forms;
 using MZ700Emul.Hardware;
@@ -22,6 +24,14 @@ public sealed class HidDiagnosticForm : Form
     private readonly SmoothLabel _hostLabel = AutoSizeMonoLabel();
     private readonly SmoothLabel _mappingLabel = AutoSizeMonoLabel();
     private readonly SmoothLabel _mzLabel = FillMonoLabel();
+    private readonly Label _statusLabel = new()
+    {
+        AutoSize = false,
+        Dock = DockStyle.Fill,
+        TextAlign = ContentAlignment.MiddleLeft,
+        Font = new Font(FontFamily.GenericSansSerif, 8.5f),
+        ForeColor = SystemColors.GrayText,
+    };
 
     // Keep focus on the main window when this diagnostic is opened —
     // the whole point is to watch the main window's input flow.
@@ -46,18 +56,94 @@ public sealed class HidDiagnosticForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 3,
+            RowCount = 4,
             Padding = new Padding(6),
         };
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
         root.Controls.Add(AutoGroup("Host input (Windows side)", _hostLabel), 0, 0);
         root.Controls.Add(AutoGroup("Mapping (which layer matched)", _mappingLabel), 0, 1);
         root.Controls.Add(FillGroup("MZ-700 side", _mzLabel), 0, 2);
+        root.Controls.Add(BuildButtonRow(), 0, 3);
         Controls.Add(root);
+    }
+
+    private Control BuildButtonRow()
+    {
+        var copyBtn = new Button { Text = "Copy", AutoSize = true, Margin = new Padding(3) };
+        copyBtn.Click += (_, _) => CopyToClipboard();
+        var saveBtn = new Button { Text = "Save…", AutoSize = true, Margin = new Padding(3) };
+        saveBtn.Click += (_, _) => SaveToFile();
+
+        var row = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 3,
+            RowCount = 1,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Margin = new Padding(0, 4, 0, 0),
+        };
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        row.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        row.Controls.Add(_statusLabel, 0, 0);
+        row.Controls.Add(copyBtn, 1, 0);
+        row.Controls.Add(saveBtn, 2, 0);
+        return row;
+    }
+
+    private void CopyToClipboard()
+    {
+        try
+        {
+            Clipboard.SetText(BuildFullDump());
+            _statusLabel.Text = "Copied current view to clipboard.";
+        }
+        catch (Exception ex)
+        {
+            _statusLabel.Text = $"Copy failed: {ex.Message}";
+        }
+    }
+
+    private void SaveToFile()
+    {
+        using var dlg = new SaveFileDialog
+        {
+            Title = "Save HID diagnostic snapshot",
+            Filter = "Text files (*.txt)|*.txt|All files (*.*)|*.*",
+            FileName = $"hid-diag-{DateTime.Now:yyyyMMdd-HHmmss}.txt",
+        };
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+        try
+        {
+            File.WriteAllText(dlg.FileName, BuildFullDump());
+            _statusLabel.Text = $"Saved to {Path.GetFileName(dlg.FileName)}.";
+        }
+        catch (Exception ex)
+        {
+            _statusLabel.Text = $"Save failed: {ex.Message}";
+        }
+    }
+
+    private string BuildFullDump()
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"MZ700Emul HID Diagnostic — {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        sb.AppendLine();
+        sb.AppendLine("=== Host input (Windows side) ===");
+        sb.AppendLine(BuildHostText());
+        sb.AppendLine("=== Mapping (which layer matched) ===");
+        sb.AppendLine(BuildMappingText());
+        sb.AppendLine("=== MZ-700 side ===");
+        sb.AppendLine(BuildMzText());
+        return sb.ToString();
     }
 
     // AutoSize labels for the AutoSize rows: GroupBox sizes to label,

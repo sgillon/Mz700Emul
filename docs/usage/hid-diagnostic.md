@@ -34,3 +34,15 @@ Three panes, all refreshed each frame:
 The window doesn't replay history — it just shows the *most recent*
 event of each kind, so press one key at a time when investigating a
 specific behaviour.
+
+**Capturing a snapshot.** Two buttons at the bottom dump the current
+contents of all three panes as plain text:
+
+- **Copy** puts the snapshot on the clipboard, ready to paste into a
+  bug report or chat.
+- **Save…** writes the same snapshot to a `.txt` file (default name
+  `hid-diag-YYYYMMDD-HHMMSS.txt`).
+
+Both capture whatever's on screen at the moment you click, so press the
+key (or wiggle the stick) you're interested in, then hit the button
+before pressing anything else.
