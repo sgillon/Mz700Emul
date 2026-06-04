@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
+using System.Linq;
 using System.Windows.Forms;
 using MZ700Emul.Hardware;
 
@@ -49,6 +50,7 @@ public sealed class MainForm : Form
         CharMap.Overrides = _settings.CharMapOverrides;
 
         Text = "Sharp MZ-700 Emulator";
+        Icon = LoadEmbeddedIcon();
         KeyPreview = true;
         AllowDrop = true;
         DoubleBuffered = true;
@@ -883,6 +885,20 @@ public sealed class MainForm : Form
             dir = Directory.GetParent(dir)?.FullName;
         }
         return null;
+    }
+
+    private static Icon? LoadEmbeddedIcon()
+    {
+        try
+        {
+            var asm = typeof(MainForm).Assembly;
+            var name = asm.GetManifestResourceNames()
+                .FirstOrDefault(n => n.EndsWith("MZ700Emul.ico", StringComparison.OrdinalIgnoreCase));
+            if (name == null) return null;
+            using var s = asm.GetManifestResourceStream(name);
+            return s == null ? null : new Icon(s);
+        }
+        catch { return null; }
     }
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]

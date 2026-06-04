@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
-    <ApplicationIcon></ApplicationIcon>
+    <ApplicationIcon>MZ700Emul.ico</ApplicationIcon>
     <AssemblyName>MZ700Emul</AssemblyName>
     <RootNamespace>MZ700Emul</RootNamespace>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -39,12 +39,19 @@
     <None Remove="Z80Core/**/*" />
   </ItemGroup>
 
-  <!-- Hardware reference images shown in the Settings dialog. Embedded so
-       the single-file publish stays self-contained (no sidecar PNGs to
-       distribute). Only the JPG/PNG family is embedded; other content in
-       _hardwareimages/ stays out of the build. -->
+  <!-- Embedded resources for the single-file publish: the joystick
+       reference image shown in the Settings dialog, and the app icon
+       loaded at runtime by Form.Icon. Listed explicitly to avoid
+       inadvertently pulling in local working files (e.g. icon source
+       PNGs in _hardwareimages/). -->
   <ItemGroup>
-    <EmbeddedResource Include="_hardwareimages\*.png" />
+    <EmbeddedResource Include="_hardwareimages\MZ-1X03.png" />
+    <!-- MZ700Emul.ico is also embedded as the Win32 resource via
+         <ApplicationIcon> above (used by Explorer, taskbar, alt-tab);
+         the EmbeddedResource entry lets MainForm load it at runtime
+         for the window title-bar icon. Source PNG + regen script
+         live in assets/. -->
+    <EmbeddedResource Include="MZ700Emul.ico" />
   </ItemGroup>
 
   <!-- Copyrighted ROM / BASIC images are NOT shipped with this project.
