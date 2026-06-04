@@ -52,7 +52,9 @@ Boot to a READY prompt before each click test.
 
 ## A3 — CharMapOverrides
 
-*(to be added when this step lands)*
+Data-only plumbing; no direct manual check. Verified at A4 via the INI
+round-trip (write an override, restart, confirm it survives and is
+honoured by `CharMap.TryLookup`).
 
 ## A4 — INI persistence and section retrofit
 
