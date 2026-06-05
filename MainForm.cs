@@ -786,7 +786,7 @@ public sealed class MainForm : Form
 
     private void OpenSettings()
     {
-        using var dlg = new SettingsForm(_settings, _joystickInput);
+        using var dlg = new SettingsForm(_settings, _joystickInput, _machine);
         dlg.Applied += OnSettingsApplied;
         dlg.ShowDialog(this);
     }

@@ -30,6 +30,12 @@ public sealed class SettingsForm : Form
 {
     private readonly Settings _settings;
     private readonly JoystickInput? _joystickInput;
+    private readonly MZ700? _machine;
+
+    // Keyboard tab
+    private KeyboardMatrixGrid? _kbdGrid;
+    private System.Windows.Forms.Timer? _kbdGridTimer;
+    private ListView? _overridesList;
 
     // Display
     private readonly RadioButton _rb1x = new() { Text = "&1× (320×200)", AutoSize = true };
@@ -53,14 +59,20 @@ public sealed class SettingsForm : Form
     /// button bindings).</summary>
     public event Action? Applied;
 
-    public SettingsForm(Settings settings, JoystickInput? joystickInput = null)
+    public SettingsForm(Settings settings, JoystickInput? joystickInput = null, MZ700? machine = null)
     {
         _settings = settings;
         _joystickInput = joystickInput;
+        _machine = machine;
         Text = "Settings";
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
-        ClientSize = new Size(640, 380);
+        // Grew (was 640×380) to fit the 10×8 matrix on the Keyboard tab
+        // plus the overrides list below it. Other tabs are short and
+        // gain whitespace — acceptable trade. Sized so the matrix
+        // (678 tall) plus a ~150 px overrides list plus button row and
+        // tab chrome all land inside the form.
+        ClientSize = new Size(740, 920);
         MinimizeBox = false;
         MaximizeBox = false;
         ShowInTaskbar = false;
@@ -70,6 +82,7 @@ public sealed class SettingsForm : Form
         tabs.TabPages.Add(BuildDisplayTab());
         tabs.TabPages.Add(BuildRomsTab());
         tabs.TabPages.Add(BuildJoystickTab());
+        tabs.TabPages.Add(BuildKeyboardTab());
 
         var buttonRow = BuildButtonRow();
 
@@ -222,6 +235,140 @@ public sealed class SettingsForm : Form
         };
         capture.Click += (_, _) => CaptureButtonFor(spinner);
         grid.Controls.Add(capture, 2, row);
+    }
+
+    private TabPage BuildKeyboardTab()
+    {
+        // Vertical split: matrix grid on top, read-only overrides list
+        // below. Tab AutoScrolls as a safety net for displays where the
+        // dialog might be clipped vertically.
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            Padding = new Padding(8),
+        };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+
+        if (_machine != null)
+        {
+            _kbdGrid = new KeyboardMatrixGrid(_machine)
+            {
+                Anchor = AnchorStyles.Top | AnchorStyles.Left,
+                Margin = new Padding(0),
+            };
+            layout.Controls.Add(_kbdGrid, 0, 0);
+
+            // Tick at 10 Hz so the live highlight tracks if anything
+            // happens to assert matrix bits while the dialog is open
+            // (auto-typer mid-sequence, etc.). Cheap when nothing changes.
+            _kbdGridTimer = new System.Windows.Forms.Timer { Interval = 100 };
+            _kbdGridTimer.Tick += (_, _) => _kbdGrid.Invalidate();
+            Load += (_, _) => _kbdGridTimer.Start();
+            FormClosed += (_, _) =>
+            {
+                _kbdGridTimer.Stop();
+                _kbdGridTimer.Dispose();
+            };
+        }
+        else
+        {
+            layout.Controls.Add(new Label
+            {
+                Text = "Keyboard matrix unavailable — emulator instance not provided.",
+                AutoSize = true,
+                ForeColor = SystemColors.GrayText,
+            }, 0, 0);
+        }
+
+        // Overrides panel — header + ListView. Aggregates both layers
+        // (CharMap chars + KeyOverride VKs) so the user sees everything
+        // currently in effect without opening settings.ini.
+        var listPanel = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            Margin = new Padding(0, 8, 0, 0),
+        };
+        listPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+        listPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        listPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+
+        listPanel.Controls.Add(new Label
+        {
+            Text = "Active overrides (read-only — editing arrives in a future update; edit settings.ini directly for now):",
+            AutoSize = true,
+            ForeColor = SystemColors.GrayText,
+            Margin = new Padding(0, 0, 0, 4),
+        }, 0, 0);
+
+        _overridesList = new ListView
+        {
+            Dock = DockStyle.Fill,
+            View = View.Details,
+            FullRowSelect = true,
+            GridLines = true,
+            HeaderStyle = ColumnHeaderStyle.Nonclickable,
+            MultiSelect = false,
+        };
+        _overridesList.Columns.Add("Layer",      80);
+        _overridesList.Columns.Add("PC trigger", 160);
+        _overridesList.Columns.Add("MZ slot",    80);
+        _overridesList.Columns.Add("Shift",      100);
+        PopulateOverridesList();
+        listPanel.Controls.Add(_overridesList, 0, 1);
+
+        layout.Controls.Add(listPanel, 0, 1);
+        return BuildTabPage("Keyboard", layout, image: null);
+    }
+
+    private void PopulateOverridesList()
+    {
+        if (_overridesList == null) return;
+        _overridesList.Items.Clear();
+
+        foreach (var kv in _settings.CharMapOverrides.All.OrderBy(k => (int)k.Key))
+        {
+            var p = kv.Value;
+            _overridesList.Items.Add(new ListViewItem(new[]
+            {
+                "CharMap",
+                $"'{kv.Key}' (U+{(int)kv.Key:X4})",
+                $"({p.Row},{p.Col})",
+                p.MzShift ? "shifted" : "unshifted",
+            }));
+        }
+
+        foreach (var kv in _settings.KeyOverrides.All.OrderBy(k => k.Key.ToString()))
+        {
+            var b = kv.Value;
+            var shiftLabel = b.MzShift switch
+            {
+                true  => "shifted",
+                false => "unshifted",
+                _     => "pass-through",
+            };
+            _overridesList.Items.Add(new ListViewItem(new[]
+            {
+                "Key",
+                kv.Key.ToString(),
+                $"({b.Row},{b.Col})",
+                shiftLabel,
+            }));
+        }
+
+        if (_overridesList.Items.Count == 0)
+        {
+            var empty = new ListViewItem(new[] { "—", "(no overrides set)", "—", "—" })
+            {
+                ForeColor = SystemColors.GrayText,
+            };
+            _overridesList.Items.Add(empty);
+        }
     }
 
     private void CaptureButtonFor(NumericUpDown target)

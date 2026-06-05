@@ -244,7 +244,45 @@ the canonical positions):**
 
 ## A7 — Settings → Keyboard tab
 
-*(to be added)*
+Open via **File → Settings…** (Ctrl+S) and switch to the new **Keyboard**
+tab.
+
+**Layout:**
+
+- [ ] Dialog opens at the grown size (740×920) — Display, ROMs,
+      Joystick tabs still fit comfortably; Keyboard tab fits the matrix
+      plus an overrides list below.
+- [ ] Keyboard tab shows the same matrix grid as **Debug → Keyboard
+      Matrix…** at the top (10 rows × 8 cols, coords + glyphs +
+      bindings, orange border on overridden slots).
+- [ ] Below the matrix: a labelled section "Active overrides
+      (read-only…)" with a four-column ListView (`Layer`, `PC trigger`,
+      `MZ slot`, `Shift`).
+
+**Overrides ListView:**
+
+- [ ] With no overrides in `settings.ini`, the ListView shows a single
+      placeholder row `— (no overrides set) — —` in grey.
+- [ ] Add `0061=6,0,f   ; 'a'` under `[CharMap]` in `settings.ini`,
+      restart, reopen Settings → Keyboard tab. The ListView shows a
+      `CharMap` row: `'a' (U+0061)` / `(6,0)` / `unshifted`.
+- [ ] Add a `[KeyOverrides]` entry such as `F5=9,3,-`, restart, reopen
+      Settings → Keyboard. The ListView shows a `Key` row: `F5` /
+      `(9,3)` / `pass-through`.
+- [ ] Both rows appear together when both overrides are present.
+- [ ] CharMap rows sort ahead of Key rows; within each layer entries
+      are sorted (CharMap by codepoint, Key by VK name).
+
+**Live behaviour:**
+
+- [ ] Switching between tabs leaves no rendering artefacts in the
+      matrix.
+- [ ] OK / Cancel / Apply still work for the existing tabs (Display
+      scale change still applies, etc.) — no regression from the
+      Keyboard tab addition.
+- [ ] Closing the dialog (OK / Cancel / X) disposes the refresh timer
+      cleanly — opening Settings twice in succession works without
+      timer leaks or exceptions.
 
 ## A8 — KeyBindingEditorForm
 
