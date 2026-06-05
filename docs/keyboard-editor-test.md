@@ -1,4 +1,4 @@
-# Keyboard editor — development test sheet
+﻿# Keyboard editor — development test sheet
 
 Manual checks accumulated step by step as Phase A of the keyboard-map
 editor work lands. Run the relevant section after each commit; add new
@@ -94,7 +94,73 @@ honoured by `CharMap.TryLookup`).
 
 ## A5 — KeyCaptureControl
 
-*(to be added)*
+Open via **Debug → Key Capture Test…**. The capture box at the top of
+the dialog highlights light-yellow when focused; the details panel
+below shows the parsed `KeyData`, bare VK, modifier mask, resolved
+char (if any), and the L/R-ambiguity flag.
+
+**Printable keys (KeyDown → KeyPress path):**
+
+- [ ] Press `a` — captured as `A` with char `'a'` (U+0061). No
+      ambiguity warning.
+- [ ] Press `Shift+a` — captured as `A, Shift` with char `'A'`
+      (U+0041).
+- [ ] Press `1`, then `Shift+1` — capture switches between `'1'` and
+      `'!'` correctly.
+
+**Non-printable keys (KeyDown-only path):**
+
+- [ ] **Esc** — captured (would normally close a dialog; doesn't here).
+      Char field reads "(none)".
+- [ ] **Enter** — captured; doesn't act as the dialog's default-button.
+- [ ] **Tab** — captured; does NOT navigate to the next control.
+- [ ] **Arrow keys** — all four captured individually; do not move
+      focus.
+- [ ] **F1–F12** — each captured.
+- [ ] **Insert / Delete / Home / End / PgUp / PgDn** — each captured.
+
+**Modifier handling:**
+
+- [ ] Press and hold **Ctrl** alone — capture box reads
+      `Ctrl held — release to bind alone, or press another key`; no
+      `Captured` event yet.
+- [ ] **Release Ctrl** without pressing anything else (tap-to-bind) —
+      captured as `Ctrl`; ambiguity note appears in orange.
+- [ ] With Ctrl still held, press `g` — captured as `Ctrl+G` with a
+      char value (PC Ctrl+G resolves to U+0007).
+- [ ] Same tap-to-bind / modifier+letter check for **Shift** and **Alt**.
+- [ ] **Alt+letter** captures without a Windows error ding — confirms
+      the host form's `ProcessCmdKey` Alt-forward is wired.
+
+**Ambiguity warning (decision #8):**
+
+- [ ] **Tap Ctrl alone** → orange note `Left/Right Ctrl share this
+      binding — both will fire.`
+- [ ] **Tap Shift alone** → orange note for Shift.
+- [ ] **Tap Alt alone** → orange note for Alt.
+- [ ] **Ctrl+G** → orange note `Ctrl modifier bound generically — left
+      and right both trigger.`
+- [ ] **Shift+Ctrl+G** → orange note covers `Ctrl / Shift` together.
+- [ ] Non-modifier keys alone (letters, digits, function keys,
+      cursors) do NOT show the orange ambiguity note.
+
+**Friendly names:**
+
+- [ ] **Page Up / Page Down** show as `Page Up` / `Page Down` (not the
+      WinForms `Prior` / `Next` names).
+- [ ] Tapping **Left Ctrl** specifically: capture line reads `Ctrl`
+      (normalised to generic); the orange ambiguity note explains why.
+
+**Reset button:**
+
+- [ ] After any capture, click **Reset** — capture box returns to the
+      `Click here, then press a key…` prompt; details panel reads
+      `Capture cleared.`; focus is returned to the capture box.
+
+**Close behaviour:**
+
+- [ ] **Close** button closes the dialog; emulator main window still
+      responds to keystrokes afterwards.
 
 ## A6 — KeyboardMatrixGrid
 

@@ -158,6 +158,7 @@ public sealed class MainForm : Form
         debug.DropDownItems.Add(new ToolStripMenuItem("&Memory Viewer…", null, (_, _) => OpenMemoryViewer()) { ShortcutKeys = Keys.Control | Keys.M });
         debug.DropDownItems.Add(new ToolStripMenuItem("&HID Diagnostic…", null, (_, _) => OpenHidDiag()) { ShortcutKeys = Keys.Control | Keys.H });
         debug.DropDownItems.Add(new ToolStripMenuItem("&Font Sheet…", null, (_, _) => OpenFontSheet()));
+        debug.DropDownItems.Add(new ToolStripMenuItem("&Key Capture Test…", null, (_, _) => OpenKeyCaptureTest()));
         debug.DropDownItems.Add(new ToolStripSeparator());
         debug.DropDownItems.Add(new ToolStripMenuItem("Run &Z80 Test (ZEXDOC/ZEXALL)…", null, (_, _) => OpenZ80Test()));
         menu.Items.Add(debug);
@@ -833,6 +834,12 @@ public sealed class MainForm : Form
         _fontSheet.Owner = this;
         _fontSheet.Show();
         _fontSheet.BringToFront();
+    }
+
+    private void OpenKeyCaptureTest()
+    {
+        using var f = new KeyCaptureTestForm();
+        f.ShowDialog(this);
     }
 
     private void OpenHidDiag()
