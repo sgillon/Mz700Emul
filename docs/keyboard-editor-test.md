@@ -164,7 +164,83 @@ char (if any), and the L/R-ambiguity flag.
 
 ## A6 — KeyboardMatrixGrid
 
-*(to be added)*
+Open via **Debug → Keyboard Matrix…**. A 10×8 grid (rows 0–9, cols 0–7)
+appears in a non-stealing tool window so the emulator main window can
+keep keyboard focus.
+
+**Layout and labels:**
+
+- [ ] Column headers `0..7` across the top, row headers `0..9` down the
+      left.
+- [ ] Each cell shows: slot coord `(r,c)` top-left, the MZ glyph(s)
+      centred, the PC keystroke(s) at the bottom.
+- [ ] For slots with both unshifted and shifted glyphs (e.g. row 5
+      digits `1`/`!`), the unshifted is on the left in black, the
+      shifted on the right in grey.
+- [ ] Special slots show their friendly label centred instead of a
+      glyph: `Enter`, `GRAPH`, `ALPHA`, `←`, `→`, `↓`, `↑`, `DEL`,
+      `INST`, `SHIFT`, `BREAK`, `CTRL`, `F1`–`F4`.
+
+**Sanity-check a handful of cells (consult `Hardware/CharMap.cs` for
+the canonical positions):**
+
+- [ ] `(4,7)` shows `A` glyph and PC binding `A a`.
+- [ ] `(1,6)` shows `Z` glyph and PC binding `Z z`.
+- [ ] `(5,7)` shows `1` / `!` and PC binding `1 !`.
+- [ ] `(0,2)` shows `;` / `+` and PC binding `; +`.
+- [ ] `(0,1)` shows `:` / `*` and PC binding `: *`.
+- [ ] `(6,4)` shows space (often blank-looking) and PC binding shows
+      a space.
+- [ ] `(0,0)` shows `Enter` label and PC binding `Enter`.
+- [ ] `(8,7)` shows `BREAK` label and PC binding `Esc (BREAK)`.
+
+**Last-matched highlight (boot to a READY prompt first):**
+
+- [ ] Press `A` on the PC keyboard — slot `(4,7)` pulses pale yellow
+      and reverts to white within ~100 ms after key-up.
+- [ ] Press `Shift+1` — slot `(5,7)` pulses yellow (the shifted MZ
+      glyph `!` is the live one).
+- [ ] Press a cursor key — slot `(7,2)`/`(7,3)`/`(7,4)`/`(7,5)` pulses.
+- [ ] Hold a key — the slot stays yellow for as long as the key is
+      held.
+
+**Override indicator:**
+
+- [ ] With a `[CharMap]` entry like `0061=6,0,f   ; 'a'` in
+      `settings.ini`, slot `(6,0)` (where `.` lives) has an orange
+      2px border and the PC binding line includes `a` alongside `.`.
+- [ ] Remove the override line and restart — the orange border at
+      `(6,0)` is gone.
+
+**Refresh:**
+
+- [ ] Opening the form a second time (close and reopen) renders the
+      same content without artefacts.
+- [ ] The emulator main window remains keyboard-focused after the
+      matrix opens (it doesn't steal focus on Show).
+
+**Coverage tracking (top-bar checkbox + Reset button):**
+
+- [ ] **Show coverage** unchecked by default; no green chyrons appear
+      regardless of which keys have been pressed.
+- [ ] Press `A`, `B`, `C` on the PC keyboard, then tick **Show
+      coverage** — small green triangles appear in the top-right corner
+      of slots `(4,7)`, `(4,6)`, `(4,5)`.
+- [ ] Press more keys with **Show coverage** still ticked — new green
+      chyrons appear immediately on those slots.
+- [ ] Untick **Show coverage** — chyrons hide; press more keys; tick
+      again — accumulated coverage is still there (tracking continues
+      while the checkbox is unticked).
+- [ ] Click **Reset** — all chyrons disappear; pressing further keys
+      starts a fresh coverage trail.
+- [ ] Hold a key while clicking Reset, then release and re-press the
+      same key — the slot gains a fresh chyron on the re-press (Reset
+      does not retro-mark currently-held keys).
+- [ ] Close the form and reopen — coverage is empty (each open is a
+      fresh tracking session).
+- [ ] Chyron stacks cleanly with the orange override border (e.g.
+      with a `[CharMap]` override on `(6,0)`, the slot shows both the
+      orange border and a green chyron once pressed).
 
 ## A7 — Settings → Keyboard tab
 

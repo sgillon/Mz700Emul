@@ -38,6 +38,7 @@ public sealed class MainForm : Form
     private MemoryViewerForm? _memViewer;
     private HidDiagnosticForm? _hidDiag;
     private FontSheetForm? _fontSheet;
+    private KeyboardMatrixForm? _matrixForm;
 
     public MainForm(string? cassettePath, bool autoLoadBasic, string? dumpPath = null)
     {
@@ -158,6 +159,7 @@ public sealed class MainForm : Form
         debug.DropDownItems.Add(new ToolStripMenuItem("&Memory Viewer…", null, (_, _) => OpenMemoryViewer()) { ShortcutKeys = Keys.Control | Keys.M });
         debug.DropDownItems.Add(new ToolStripMenuItem("&HID Diagnostic…", null, (_, _) => OpenHidDiag()) { ShortcutKeys = Keys.Control | Keys.H });
         debug.DropDownItems.Add(new ToolStripMenuItem("&Font Sheet…", null, (_, _) => OpenFontSheet()));
+        debug.DropDownItems.Add(new ToolStripMenuItem("Keyboard &Matrix…", null, (_, _) => OpenKeyboardMatrix()));
         debug.DropDownItems.Add(new ToolStripMenuItem("&Key Capture Test…", null, (_, _) => OpenKeyCaptureTest()));
         debug.DropDownItems.Add(new ToolStripSeparator());
         debug.DropDownItems.Add(new ToolStripMenuItem("Run &Z80 Test (ZEXDOC/ZEXALL)…", null, (_, _) => OpenZ80Test()));
@@ -840,6 +842,17 @@ public sealed class MainForm : Form
     {
         using var f = new KeyCaptureTestForm();
         f.ShowDialog(this);
+    }
+
+    private void OpenKeyboardMatrix()
+    {
+        if (_matrixForm == null || _matrixForm.IsDisposed)
+            _matrixForm = new KeyboardMatrixForm(_machine);
+        _matrixForm.Owner = this;
+        // Deliberately not BringToFront — that activates the window and
+        // steals focus from the emulator; we want to watch the highlight
+        // pulse while typing into the main window.
+        _matrixForm.Show();
     }
 
     private void OpenHidDiag()
