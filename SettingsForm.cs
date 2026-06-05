@@ -260,6 +260,7 @@ public sealed class SettingsForm : Form
                 Anchor = AnchorStyles.Top | AnchorStyles.Left,
                 Margin = new Padding(0),
             };
+            _kbdGrid.CellClicked += OnKeyboardCellClicked;
             layout.Controls.Add(_kbdGrid, 0, 0);
 
             // Tick at 10 Hz so the live highlight tracks if anything
@@ -300,7 +301,7 @@ public sealed class SettingsForm : Form
 
         listPanel.Controls.Add(new Label
         {
-            Text = "Active overrides (read-only — editing arrives in a future update; edit settings.ini directly for now):",
+            Text = "Active overrides (summary — click a matrix cell above to edit a CharMap binding; KeyOverrides editing arrives in Phase B):",
             AutoSize = true,
             ForeColor = SystemColors.GrayText,
             Margin = new Padding(0, 0, 0, 4),
@@ -324,6 +325,19 @@ public sealed class SettingsForm : Form
 
         layout.Controls.Add(listPanel, 0, 1);
         return BuildTabPage("Keyboard", layout, image: null);
+    }
+
+    private void OnKeyboardCellClicked(object? sender, CellClickedEventArgs e)
+    {
+        // Editor mutates CharMapOverrides directly — change is live for
+        // subsequent emulator keystrokes. Persistence still waits for
+        // this dialog's Apply / OK (see ApplyChanges → Settings.Save),
+        // consistent with the rest of the tab pattern.
+        using var editor = new KeyBindingEditorForm(
+            e.Row, e.Col, e.MzShift, _settings.CharMapOverrides);
+        if (editor.ShowDialog(this) != DialogResult.OK) return;
+        _kbdGrid?.RefreshBindings();
+        PopulateOverridesList();
     }
 
     private void PopulateOverridesList()

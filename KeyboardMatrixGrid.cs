@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -56,6 +57,14 @@ public sealed class KeyboardMatrixGrid : UserControl
     /// pressed since this grid was created (or ResetCoverage was
     /// called). Off by default; tracking happens regardless.</summary>
     public bool ShowCoverage { get; set; }
+
+    /// <summary>
+    /// Raised when the user clicks a matrix cell. Subscribed by editing
+    /// hosts (Settings → Keyboard tab) to open the binding editor;
+    /// read-only hosts (Debug → Keyboard Matrix…) simply don't subscribe.
+    /// The cursor changes to a hand only while a subscriber is attached.
+    /// </summary>
+    public event EventHandler<CellClickedEventArgs>? CellClicked;
 
     public KeyboardMatrixGrid(MZ700 machine)
     {
@@ -170,6 +179,57 @@ public sealed class KeyboardMatrixGrid : UserControl
         }
     }
 
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+        // Hand cursor only over real cells, and only when somebody's
+        // listening (so the standalone diagnostic window stays read-only).
+        if (CellClicked != null && HitTest(e.X, e.Y).row >= 0)
+            Cursor = Cursors.Hand;
+        else
+            Cursor = Cursors.Default;
+    }
+
+    protected override void OnMouseClick(MouseEventArgs e)
+    {
+        base.OnMouseClick(e);
+        if (CellClicked == null) return;
+        if (e.Button != MouseButtons.Left) return;
+        var (r, c) = HitTest(e.X, e.Y);
+        if (r < 0) return;
+        bool mzShift = DetermineShiftedHalf(e.X, r, c);
+        CellClicked.Invoke(this, new CellClickedEventArgs(r, c, mzShift));
+    }
+
+    private static (int row, int col) HitTest(int x, int y)
+    {
+        int gx = x - Pad - LeftMargin;
+        int gy = y - Pad - TopMargin;
+        if (gx < 0 || gy < 0) return (-1, -1);
+        int c = gx / CellW;
+        int r = gy / CellH;
+        if (r < 0 || r >= Rows || c < 0 || c >= Cols) return (-1, -1);
+        return (r, c);
+    }
+
+    // Slots with both unshifted and shifted printable glyphs render with
+    // the unshifted glyph in the left half and the shifted one in the
+    // right half. A click on the right half is interpreted as "the user
+    // wants the shifted side". For shift-only slots, always shifted; for
+    // unshifted-only slots (and slots with no printable glyph at all),
+    // always unshifted.
+    private static bool DetermineShiftedHalf(int x, int r, int c)
+    {
+        var un = MzGlyphCatalog.FindByPrintableSlot(r, c, false);
+        var sh = MzGlyphCatalog.FindByPrintableSlot(r, c, true);
+        if (un.HasValue && sh.HasValue)
+        {
+            int cellX = Pad + LeftMargin + c * CellW;
+            return x >= cellX + CellW / 2;
+        }
+        return sh.HasValue;
+    }
+
     /// <summary>Clear accumulated coverage state (the green chyrons).
     /// Does not touch <see cref="_wasPressed"/>, so keys currently held
     /// won't re-trigger until they're released and pressed again.</summary>
@@ -280,5 +340,22 @@ public sealed class KeyboardMatrixGrid : UserControl
             // No printable glyph and no special label = unmapped slot.
             TextRenderer.DrawText(g, "·", _coordFont, fullRect, Color.LightGray, flags);
         }
+    }
+}
+
+public sealed class CellClickedEventArgs : EventArgs
+{
+    public int Row { get; }
+    public int Col { get; }
+    /// <summary>True if the user clicked the shifted half of a cell that
+    /// has both unshifted and shifted glyphs, or a shift-only slot. The
+    /// binding editor uses this as the default for its MzShift checkbox.</summary>
+    public bool MzShift { get; }
+
+    public CellClickedEventArgs(int row, int col, bool mzShift)
+    {
+        Row = row;
+        Col = col;
+        MzShift = mzShift;
     }
 }

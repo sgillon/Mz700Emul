@@ -286,7 +286,103 @@ tab.
 
 ## A8 — KeyBindingEditorForm
 
-*(to be added)*
+Open via **File → Settings…** → **Keyboard** tab. The matrix grid in
+this tab is now clickable; the standalone **Debug → Keyboard Matrix…**
+window stays read-only.
+
+**Cursor and hit-testing:**
+
+- [ ] Hovering over a matrix cell in the Settings tab shows a hand
+      cursor; hovering over the headers or padding shows the default
+      cursor.
+- [ ] **Debug → Keyboard Matrix…** (the diagnostic window) shows the
+      default cursor over cells — no editor opens on click there.
+
+**Opening the editor — printable slots:**
+
+- [ ] Click slot `(4,7)` (the `A` cell). The editor opens titled
+      `Bind PC key to MZ slot`, header reads
+      `Target: MZ slot (4,7) producing 'A' (unshifted)`.
+- [ ] Click the right half of slot `(5,7)` (the `!` half). Header reads
+      `Target: MZ slot (5,7) producing '!' (shifted)`.
+- [ ] Click the left half of slot `(5,7)` (the `1` half). Header reads
+      `Target: MZ slot (5,7) producing '1' (unshifted)`.
+- [ ] Click slot `(0,1)` left half (`:`). Header reads
+      `Target: MZ slot (0,1) producing ':' (unshifted)`.
+
+**Opening the editor — special slots:**
+
+- [ ] Click slot `(0,0)` (Enter). Header reads
+      `Target: MZ slot (0,0) — Enter (unshifted)`.
+- [ ] Click slot `(7,2)` (a cursor key). Header reads
+      `Target: MZ slot (7,2) — <cursor label> (unshifted)`.
+
+**Capture + Save (printable char):**
+
+- [ ] In the editor opened on `(0,1)` (the `:` / `*` cell), capture
+      `;` on the PC keyboard. Status line reads
+      `Will bind ';' (U+003B) → (0,1) — default maps to (0,2) unshifted.`
+      Save button becomes enabled.
+- [ ] Click **Save**. Editor closes. Matrix grid now shows slot `(0,1)`
+      with an orange override border and the PC binding line including
+      `;`. The overrides ListView shows a `CharMap` row:
+      `';' (U+003B)` / `(0,1)` / `unshifted`.
+- [ ] Bring up a BASIC `READY` prompt (Settings still open is fine —
+      close the dialog first if it grabs keystrokes) and press `;` on
+      the PC keyboard. The MZ-700 produces `:` (the `(0,1)` unshifted
+      glyph), not `;`.
+
+**Capture + Save (non-character VK refused):**
+
+- [ ] Click any printable cell, then press **F5** in the capture box.
+      Status line is empty; the orange Phase-B note appears explaining
+      that non-character keys aren't editable in Phase A. Save button
+      stays disabled.
+- [ ] Same with **Tab**, **Esc**, **Enter**, **Up arrow**, **Home**.
+- [ ] Tap and release **Shift** alone. Same Phase-B refusal (modifiers
+      are KeyOverrides territory).
+
+**Advanced expander:**
+
+- [ ] The MzShift checkbox is hidden by default. Click **Advanced ▾** —
+      the panel expands, button changes to **Advanced ▴**, the checkbox
+      is visible with its initial state matching the half clicked.
+- [ ] Click **Advanced ▴** — panel collapses.
+- [ ] Open the editor by left-clicking slot `(5,7)` (the `1` half).
+      Expand Advanced, tick the MzShift checkbox. Capture `?`. Save.
+      The overrides ListView shows the new entry as `shifted`.
+
+**Re-bind existing override:**
+
+- [ ] With the `;` → `(0,1)` override from the earlier step in place,
+      click slot `(0,2)` (the original home of `;`). Capture `;`.
+      Status line reads
+      `... currently overridden to (0,1) unshifted.`
+- [ ] Click **Save**. ListView updates — the override now points to
+      `(0,2)` (back to the original slot). Live re-bind worked.
+
+**Cancel / dismiss:**
+
+- [ ] Open the editor, capture a char, click **Cancel** — editor closes,
+      matrix and ListView unchanged.
+- [ ] Open the editor, capture a char, press **Esc** — editor closes
+      without saving.
+- [ ] Open the editor, capture a char, press **Enter** — Save fires
+      (Save is the AcceptButton).
+
+**Persistence:**
+
+- [ ] After a Save and dialog **Apply** / **OK**, the override is
+      written to `settings.ini` under `[CharMap]` (4-digit hex codepoint
+      with trailing glyph comment).
+- [ ] After a Save followed by dialog **Cancel**, the override is
+      *live* for this session but not persisted — restart and the
+      binding is gone.
+
+**Visual hint of editability:**
+
+- [ ] The Debug → Keyboard Matrix… diagnostic still uses the default
+      cursor over cells (no subscriber → no hand cursor → no editor).
 
 ## A9 — Reset buttons
 
