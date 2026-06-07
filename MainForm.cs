@@ -38,7 +38,14 @@ public sealed class MainForm : Form
     private MemoryViewerForm? _memViewer;
     private HidDiagnosticForm? _hidDiag;
     private FontSheetForm? _fontSheet;
+    // Tracks the previous GRAPH-mode bit so we can detect ALPHA→GRAPH
+    // transitions and auto-surface the Font Sheet — the only way to
+    // reach MZ-only graphic glyphs (no PC-key equivalent exists). Opens
+    // unconditionally on each transition (if not already visible) since
+    // GRAPH mode is effectively unusable without it.
+    private bool _wasGraphMode;
     private KeyboardMatrixForm? _matrixForm;
+    private MzKeyboardDiagramForm? _diagramForm;
 
     public MainForm(string? cassettePath, bool autoLoadBasic, string? dumpPath = null)
     {
@@ -152,6 +159,15 @@ public sealed class MainForm : Form
             _scaleMenuItems[i] = item;
             view.DropDownItems.Add(item);
         }
+        view.DropDownItems.Add(new ToolStripSeparator());
+        // Font Sheet — always available from View for click-to-type
+        // glyph access. Also auto-surfaces in the Timer_Tick handler
+        // on ALPHA→GRAPH transitions, since graphic glyphs have no
+        // PC-key equivalent.
+        view.DropDownItems.Add(new ToolStripMenuItem("&Font Sheet…", null, (_, _) => OpenFontSheet())
+        {
+            ShortcutKeys = Keys.Control | Keys.G,
+        });
         menu.Items.Add(view);
 
         var debug = new ToolStripMenuItem("&Debug");
@@ -160,6 +176,7 @@ public sealed class MainForm : Form
         debug.DropDownItems.Add(new ToolStripMenuItem("&HID Diagnostic…", null, (_, _) => OpenHidDiag()) { ShortcutKeys = Keys.Control | Keys.H });
         debug.DropDownItems.Add(new ToolStripMenuItem("&Font Sheet…", null, (_, _) => OpenFontSheet()));
         debug.DropDownItems.Add(new ToolStripMenuItem("Keyboard &Matrix…", null, (_, _) => OpenKeyboardMatrix()));
+        debug.DropDownItems.Add(new ToolStripMenuItem("MZ Keyboard &Diagram…", null, (_, _) => OpenKeyboardDiagram()));
         debug.DropDownItems.Add(new ToolStripMenuItem("&Key Capture Test…", null, (_, _) => OpenKeyCaptureTest()));
         debug.DropDownItems.Add(new ToolStripSeparator());
         debug.DropDownItems.Add(new ToolStripMenuItem("Run &Z80 Test (ZEXDOC/ZEXALL)…", null, (_, _) => OpenZ80Test()));
@@ -345,6 +362,17 @@ public sealed class MainForm : Form
                     _modeLabel.ForeColor = SystemColors.ControlText;
                     _modeLabel.BackColor = SystemColors.Control;
                 }
+                // ALPHA→GRAPH transition: surface the Font Sheet, since
+                // graphic glyphs aren't reachable from any PC key. Opens
+                // every transition (if not already visible) — GRAPH mode
+                // is effectively unusable without the palette, so always
+                // putting it in front is the right default.
+                if (graph && !_wasGraphMode &&
+                    (_fontSheet == null || _fontSheet.IsDisposed || !_fontSheet.Visible))
+                {
+                    OpenFontSheet();
+                }
+                _wasGraphMode = graph;
             }
         }
 
@@ -853,6 +881,15 @@ public sealed class MainForm : Form
         // steals focus from the emulator; we want to watch the highlight
         // pulse while typing into the main window.
         _matrixForm.Show();
+    }
+
+    private void OpenKeyboardDiagram()
+    {
+        if (_diagramForm == null || _diagramForm.IsDisposed)
+            _diagramForm = new MzKeyboardDiagramForm();
+        _diagramForm.SetLabels(_settings.CharMapOverrides, _machine.Keyboard.Overrides);
+        _diagramForm.Owner = this;
+        _diagramForm.Show();
     }
 
     private void OpenHidDiag()

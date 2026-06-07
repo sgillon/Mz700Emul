@@ -27,6 +27,7 @@ settings.ini
 
 # Local convenience scripts
 resumeproject.bat
+resumeproject.cmd
 
 # Local working dirs — convention: any folder prefixed with '_' is
 # local-only (session artifacts, scratch dumps, downloaded reference

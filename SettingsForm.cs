@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -32,7 +33,11 @@ public sealed class SettingsForm : Form
     private readonly JoystickInput? _joystickInput;
     private readonly MZ700? _machine;
 
-    // Keyboard tab
+    // Keyboard tab — diagram is the primary view (P2-7); matrix grid
+    // lives behind an Advanced expander.
+    private MzKeyboardDiagram? _kbdDiagram;
+    private Button? _advancedKbdBtn;
+    private Panel? _advancedKbdPanel;
     private KeyboardMatrixGrid? _kbdGrid;
     private System.Windows.Forms.Timer? _kbdGridTimer;
     private ListView? _overridesList;
@@ -239,20 +244,58 @@ public sealed class SettingsForm : Form
 
     private TabPage BuildKeyboardTab()
     {
-        // Vertical split: matrix grid on top, read-only overrides list
-        // below. Tab AutoScrolls as a safety net for displays where the
-        // dialog might be clipped vertically.
+        // P2-7 layout: MzKeyboardDiagram is the primary view (top),
+        // matrix grid is hidden behind an Advanced expander, and the
+        // overrides list keeps its place at the bottom. AutoScroll on
+        // the tab content covers the matrix grid (~678 tall) when the
+        // expander is open, since the dialog itself is fixed-size.
         var layout = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 2,
+            RowCount = 5,
             Padding = new Padding(8),
+            AutoScroll = true,
         };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));        // caption
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 210f));  // diagram
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));        // advanced button
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));        // advanced panel
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));   // overrides list
 
+        layout.Controls.Add(new Label
+        {
+            Text = "Click any key on the diagram to edit its PC-keyboard binding. "
+                 + "Each cap shows the PC key(s) currently bound to it.",
+            AutoSize = true,
+            MaximumSize = new Size(700, 0),
+            ForeColor = SystemColors.GrayText,
+            Margin = new Padding(0, 0, 0, 4),
+        }, 0, 0);
+
+        _kbdDiagram = new MzKeyboardDiagram { Dock = DockStyle.Fill };
+        _kbdDiagram.KeyClicked += OnKeyboardDiagramKeyClicked;
+        RefreshKeyboardDiagramLabels();
+        layout.Controls.Add(_kbdDiagram, 0, 1);
+
+        _advancedKbdBtn = new Button
+        {
+            Text = "Advanced — matrix grid ▾",
+            AutoSize = true,
+            FlatStyle = FlatStyle.Flat,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Margin = new Padding(0, 8, 0, 4),
+        };
+        _advancedKbdBtn.FlatAppearance.BorderSize = 0;
+        _advancedKbdBtn.Click += (_, _) => ToggleAdvancedKbd();
+        layout.Controls.Add(_advancedKbdBtn, 0, 2);
+
+        _advancedKbdPanel = new Panel
+        {
+            AutoSize = true,
+            Visible = false,
+        };
         if (_machine != null)
         {
             _kbdGrid = new KeyboardMatrixGrid(_machine)
@@ -261,13 +304,18 @@ public sealed class SettingsForm : Form
                 Margin = new Padding(0),
             };
             _kbdGrid.CellClicked += OnKeyboardCellClicked;
-            layout.Controls.Add(_kbdGrid, 0, 0);
+            _advancedKbdPanel.Controls.Add(_kbdGrid);
 
             // Tick at 10 Hz so the live highlight tracks if anything
             // happens to assert matrix bits while the dialog is open
-            // (auto-typer mid-sequence, etc.). Cheap when nothing changes.
+            // (auto-typer mid-sequence, etc.). Skip the invalidate when
+            // the panel is collapsed — no point repainting an offscreen
+            // control.
             _kbdGridTimer = new System.Windows.Forms.Timer { Interval = 100 };
-            _kbdGridTimer.Tick += (_, _) => _kbdGrid.Invalidate();
+            _kbdGridTimer.Tick += (_, _) =>
+            {
+                if (_advancedKbdPanel?.Visible == true) _kbdGrid?.Invalidate();
+            };
             Load += (_, _) => _kbdGridTimer.Start();
             FormClosed += (_, _) =>
             {
@@ -277,13 +325,14 @@ public sealed class SettingsForm : Form
         }
         else
         {
-            layout.Controls.Add(new Label
+            _advancedKbdPanel.Controls.Add(new Label
             {
-                Text = "Keyboard matrix unavailable — emulator instance not provided.",
+                Text = "Matrix grid unavailable — emulator instance not provided.",
                 AutoSize = true,
                 ForeColor = SystemColors.GrayText,
-            }, 0, 0);
+            });
         }
+        layout.Controls.Add(_advancedKbdPanel, 0, 3);
 
         // Overrides panel — header + ListView. Aggregates both layers
         // (CharMap chars + KeyOverride VKs) so the user sees everything
@@ -296,16 +345,49 @@ public sealed class SettingsForm : Form
             Margin = new Padding(0, 8, 0, 0),
         };
         listPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-        listPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        listPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));   // header row (label + import/export)
         listPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
 
-        listPanel.Controls.Add(new Label
+        // Header row: caption on the left, Export / Import buttons on
+        // the right. Three columns — label (AutoSize), spacer (100%),
+        // buttons (AutoSize) — so both the label and the button group
+        // get their natural width and the spacer eats whatever's left.
+        var headerRow = new TableLayoutPanel
         {
-            Text = "Active overrides (summary — click a matrix cell above to edit a CharMap binding; KeyOverrides editing arrives in Phase B):",
+            Dock = DockStyle.Top,
+            ColumnCount = 3,
+            RowCount = 1,
+            AutoSize = true,
+            Margin = new Padding(0, 0, 0, 4),
+        };
+        headerRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        headerRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+        headerRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        headerRow.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+        headerRow.Controls.Add(new Label
+        {
+            Text = "Active overrides (summary):",
             AutoSize = true,
             ForeColor = SystemColors.GrayText,
-            Margin = new Padding(0, 0, 0, 4),
+            Anchor = AnchorStyles.Left | AnchorStyles.Bottom,
         }, 0, 0);
+
+        var ioButtons = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.LeftToRight,
+            AutoSize = true,
+            WrapContents = false,
+            Margin = new Padding(0),
+        };
+        var exportBtn = new Button { Text = "Export…", Width = 90 };
+        var importBtn = new Button { Text = "Import…", Width = 90 };
+        exportBtn.Click += (_, _) => OnExportMzKbd();
+        importBtn.Click += (_, _) => OnImportMzKbd();
+        ioButtons.Controls.Add(exportBtn);
+        ioButtons.Controls.Add(importBtn);
+        headerRow.Controls.Add(ioButtons, 2, 0);
+        listPanel.Controls.Add(headerRow, 0, 0);
 
         _overridesList = new ListView
         {
@@ -315,6 +397,7 @@ public sealed class SettingsForm : Form
             GridLines = true,
             HeaderStyle = ColumnHeaderStyle.Nonclickable,
             MultiSelect = false,
+            Height = 140,
         };
         _overridesList.Columns.Add("Layer",      80);
         _overridesList.Columns.Add("PC trigger", 160);
@@ -323,20 +406,198 @@ public sealed class SettingsForm : Form
         PopulateOverridesList();
         listPanel.Controls.Add(_overridesList, 0, 1);
 
-        layout.Controls.Add(listPanel, 0, 1);
+        layout.Controls.Add(listPanel, 0, 4);
         return BuildTabPage("Keyboard", layout, image: null);
+    }
+
+    private void OnExportMzKbd()
+    {
+        using var dlg = new SaveFileDialog
+        {
+            Title = "Export keyboard mapping",
+            Filter = KeyboardMapFile.FileFilter,
+            DefaultExt = "mzkbd",
+            AddExtension = true,
+            FileName = "mz700-keyboard.mzkbd",
+            InitialDirectory = AppContext.BaseDirectory,
+            OverwritePrompt = true,
+        };
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+        try
+        {
+            KeyboardMapFile.Save(dlg.FileName,
+                _settings.CharMapOverrides, _settings.KeyOverrides);
+            MessageBox.Show(this,
+                $"Exported {_settings.CharMapOverrides.Count} CharMap and " +
+                $"{_settings.KeyOverrides.Count} KeyOverride entries to:\n{dlg.FileName}",
+                "Export complete",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this,
+                $"Failed to save the file:\n\n{ex.Message}",
+                "Export failed",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void OnImportMzKbd()
+    {
+        using var dlg = new OpenFileDialog
+        {
+            Title = "Import keyboard mapping",
+            Filter = KeyboardMapFile.FileFilter,
+            InitialDirectory = AppContext.BaseDirectory,
+            CheckFileExists = true,
+        };
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+        CharMapOverrides importedChars;
+        KeyOverride importedVks;
+        try
+        {
+            (importedChars, importedVks) = KeyboardMapFile.Load(dlg.FileName);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this,
+                $"Failed to read the file:\n\n{ex.Message}",
+                "Import failed",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return;
+        }
+
+        // Empty file = nothing actionable; bail with a friendly note
+        // rather than silently no-op.
+        if (importedChars.Count == 0 && importedVks.Count == 0)
+        {
+            MessageBox.Show(this,
+                "The file didn't contain any overrides to import.",
+                "Nothing to import",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        // Merge / Replace / Cancel via a three-button prompt.
+        // Yes = Merge (apply on top of current overrides),
+        // No  = Replace (clear current first).
+        var choice = MessageBox.Show(this,
+            $"Import contains {importedChars.Count} CharMap and " +
+            $"{importedVks.Count} KeyOverride entries.\n\n" +
+            "Yes  = Merge into current overrides (imported entries win on conflict).\n" +
+            "No   = Replace current overrides entirely.\n" +
+            "Cancel = abort import.",
+            "Import keyboard mapping",
+            MessageBoxButtons.YesNoCancel,
+            MessageBoxIcon.Question);
+        if (choice == DialogResult.Cancel) return;
+
+        if (choice == DialogResult.No)
+        {
+            _settings.CharMapOverrides.Clear();
+            _settings.KeyOverrides.Clear();
+        }
+        foreach (var kv in importedChars.All)
+            _settings.CharMapOverrides.Set(kv.Key, kv.Value);
+        foreach (var kv in importedVks.All)
+            _settings.KeyOverrides.Set(kv.Key, kv.Value);
+
+        // Refresh the surface controls so the change is visible
+        // immediately. Persistence still waits for Apply / OK.
+        RefreshKeyboardDiagramLabels();
+        _kbdGrid?.RefreshBindings();
+        PopulateOverridesList();
+    }
+
+    private void ToggleAdvancedKbd()
+    {
+        if (_advancedKbdPanel == null || _advancedKbdBtn == null) return;
+        _advancedKbdPanel.Visible = !_advancedKbdPanel.Visible;
+        _advancedKbdBtn.Text = _advancedKbdPanel.Visible
+            ? "Advanced — matrix grid ▴"
+            : "Advanced — matrix grid ▾";
+    }
+
+    private void OnKeyboardDiagramKeyClicked(object? sender, KeyDiagramClickedEventArgs e)
+    {
+        // Editor mutates the override layers directly — change is live
+        // for subsequent emulator keystrokes. Persistence still waits
+        // for this dialog's Apply / OK.
+        using var editor = new MzKeyEditorForm(
+            e.Key, _settings.CharMapOverrides, _settings.KeyOverrides);
+        editor.ShowDialog(this);
+        RefreshKeyboardDiagramLabels();
+        _kbdGrid?.RefreshBindings();
+        PopulateOverridesList();
+    }
+
+    private void RefreshKeyboardDiagramLabels()
+    {
+        if (_kbdDiagram == null) return;
+        _kbdDiagram.PcKeyLabels = PcKeyIndex.BuildLabelsByMzKey(
+            _settings.CharMapOverrides, _settings.KeyOverrides);
+
+        // Recompute the unreachable-essential set so the red outline on
+        // affected caps tracks live with edits — Apply's safety gate
+        // reads the same set, so what you see on the diagram before
+        // Apply is what the confirm dialog will mention.
+        var slotShiftLabels = PcKeyIndex.BuildLabelsBySlotShift(
+            _settings.CharMapOverrides, _settings.KeyOverrides);
+        var unreachable = new HashSet<string>();
+        foreach (var k in MzKeyboardLayout.EssentialKeys)
+        {
+            if (!IsKeyFullyReachable(k, slotShiftLabels))
+                unreachable.Add(k.Id);
+        }
+        _kbdDiagram.UnreachableKeyIds = unreachable.Count > 0 ? unreachable : null;
+
+        _kbdDiagram.RefreshLabels();
+    }
+
+    /// <summary>
+    /// A character key with both unshifted and shifted glyphs is
+    /// "fully reachable" only if both halves can be produced from the
+    /// host keyboard — losing just the shifted half (e.g. PC '1'
+    /// rebound but Shift+1 still maps to MZ '!') still leaves the
+    /// unshifted half unreachable, which the gate must surface.
+    ///
+    /// Fixed-label keys (CR, GRAPH, ALPHA, CTRL, SHIFT, BREAK, INST,
+    /// DEL, cursors) are shift-agnostic — any binding in either shift
+    /// state is enough.
+    /// </summary>
+    private static bool IsKeyFullyReachable(
+        MzKeyboardLayout.MzKey k,
+        IReadOnlyDictionary<(int row, int col, bool shift), IReadOnlyList<string>> labels)
+    {
+        if (!k.Row.HasValue || !k.Col.HasValue) return true;
+        int row = k.Row.Value, col = k.Col.Value;
+
+        if (!string.IsNullOrEmpty(k.FixedLabel))
+            return labels.ContainsKey((row, col, false))
+                || labels.ContainsKey((row, col, true));
+
+        bool hasUnshifted = !string.IsNullOrEmpty(k.UnshiftedLabel)
+            || MzGlyphCatalog.FindByPrintableSlot(row, col, false).HasValue;
+        bool hasShifted = !string.IsNullOrEmpty(k.ShiftedLabel)
+            || MzGlyphCatalog.FindByPrintableSlot(row, col, true).HasValue;
+
+        if (hasUnshifted && !labels.ContainsKey((row, col, false))) return false;
+        if (hasShifted && !labels.ContainsKey((row, col, true))) return false;
+        return true;
     }
 
     private void OnKeyboardCellClicked(object? sender, CellClickedEventArgs e)
     {
-        // Editor mutates CharMapOverrides directly — change is live for
-        // subsequent emulator keystrokes. Persistence still waits for
-        // this dialog's Apply / OK (see ApplyChanges → Settings.Save),
-        // consistent with the rest of the tab pattern.
+        // Matrix-grid click path (Advanced view) still uses the char-only
+        // editor — the matrix grid surfaces individual (row, col, shift)
+        // slots, which the char layer is keyed by. Fixed-label slots are
+        // routed through the diagram instead.
         using var editor = new KeyBindingEditorForm(
             e.Row, e.Col, e.MzShift, _settings.CharMapOverrides);
         if (editor.ShowDialog(this) != DialogResult.OK) return;
         _kbdGrid?.RefreshBindings();
+        RefreshKeyboardDiagramLabels();
         PopulateOverridesList();
     }
 
@@ -433,11 +694,24 @@ public sealed class SettingsForm : Form
 
     private Panel BuildButtonRow()
     {
-        var ok = new Button { Text = "OK", DialogResult = DialogResult.OK, Width = 80 };
+        var ok = new Button { Text = "OK", DialogResult = DialogResult.None, Width = 80 };
         var cancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Width = 80 };
         var apply = new Button { Text = "Apply", Width = 80 };
-        ok.Click += (_, _) => { ApplyChanges(); Close(); };
-        apply.Click += (_, _) => ApplyChanges();
+        // OK / Apply both run the safety gate before persisting. OK uses
+        // DialogResult.None so a refused gate keeps the dialog open
+        // rather than closing as it would with DialogResult.OK.
+        ok.Click += (_, _) =>
+        {
+            if (!ConfirmKeyboardSafetyGate()) return;
+            ApplyChanges();
+            DialogResult = DialogResult.OK;
+            Close();
+        };
+        apply.Click += (_, _) =>
+        {
+            if (!ConfirmKeyboardSafetyGate()) return;
+            ApplyChanges();
+        };
 
         var flow = new FlowLayoutPanel
         {
@@ -481,6 +755,57 @@ public sealed class SettingsForm : Form
         _settings.JoyButton2Index = (int)_numButton2.Value;
         _settings.Save();
         Applied?.Invoke();
+    }
+
+    /// <summary>
+    /// P2-9 safety gate: if any essential MZ key has no PC binding,
+    /// switch to the Keyboard tab, highlight the unreachable caps on
+    /// the diagram (already happening live via
+    /// <see cref="RefreshKeyboardDiagramLabels"/>), and ask the user to
+    /// confirm before saving. Returns true if Apply may proceed.
+    /// </summary>
+    private bool ConfirmKeyboardSafetyGate()
+    {
+        var unreachableIds = _kbdDiagram?.UnreachableKeyIds;
+        if (unreachableIds == null || unreachableIds.Count == 0) return true;
+
+        var unreachable = MzKeyboardLayout.Keys
+            .Where(k => unreachableIds.Contains(k.Id))
+            .ToList();
+
+        // Pull the user's attention to the diagram so the red outlines
+        // and the dialog text describe the same keys.
+        if (_kbdDiagram?.Parent is TabPage page && page.Parent is TabControl tabs)
+            tabs.SelectedTab = page;
+
+        const int previewMax = 10;
+        var names = string.Join(", ", unreachable.Take(previewMax).Select(DescribeKeyForGate));
+        if (unreachable.Count > previewMax)
+            names += $", … (+{unreachable.Count - previewMax} more)";
+
+        var result = MessageBox.Show(this,
+            $"{unreachable.Count} essential MZ key(s) have no PC binding:\n\n" +
+            $"{names}\n\n" +
+            "These keys are unreachable from the host keyboard until rebound. " +
+            "Apply anyway?",
+            "Unreachable keys — Apply anyway?",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Warning);
+        return result == DialogResult.Yes;
+    }
+
+    private static string DescribeKeyForGate(MzKeyboardLayout.MzKey k)
+    {
+        if (!string.IsNullOrEmpty(k.FixedLabel)) return k.FixedLabel!;
+        if (!string.IsNullOrEmpty(k.UnshiftedLabel)) return k.UnshiftedLabel!;
+        if (!string.IsNullOrEmpty(k.ShiftedLabel)) return k.ShiftedLabel!;
+        if (k.Row.HasValue && k.Col.HasValue)
+        {
+            var c = MzGlyphCatalog.FindByPrintableSlot(k.Row.Value, k.Col.Value, false)
+                  ?? MzGlyphCatalog.FindByPrintableSlot(k.Row.Value, k.Col.Value, true);
+            if (c.HasValue) return c.Value.ToString();
+        }
+        return k.Id;
     }
 
     // -- ROM browse + path-status indicator -----------------------------

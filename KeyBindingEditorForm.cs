@@ -16,6 +16,11 @@ namespace MZ700Emul;
 /// grid). The MzShift checkbox under the Advanced expander lets the user
 /// flip the shift assertion away from the default the cell-click implied.
 ///
+/// Conflict detection (P2-5): if the captured PC char already produces a
+/// different MZ slot — either via an existing override or a built-in
+/// default — the status line flips to a warning, and Save prompts for
+/// confirmation before clobbering the prior binding.
+///
 /// Mutations are live: <see cref="CharMapOverrides.Set"/> is called from
 /// Save and immediately affects subsequent keystrokes. Persistence to
 /// <c>settings.ini</c> still waits for the parent <see cref="SettingsForm"/>'s
@@ -37,6 +42,15 @@ public sealed class KeyBindingEditorForm : Form
     private readonly Button _saveBtn;
 
     private char? _capturedChar;
+
+    // When non-null, the captured char already maps to a different slot
+    // (or different shift state). Save will prompt before replacing it.
+    // Recomputed on every capture and whenever the MzShift checkbox flips.
+    private ConflictInfo? _conflict;
+
+    private readonly record struct ConflictInfo(
+        CharMap.Press Existing,
+        bool FromOverride);
 
     public KeyBindingEditorForm(int row, int col, bool defaultMzShift, CharMapOverrides overrides)
     {
@@ -139,6 +153,7 @@ public sealed class KeyBindingEditorForm : Form
             Margin = new Padding(16, 4, 0, 0),
         };
         _advancedPanel.Controls.Add(_shiftCheck);
+        _shiftCheck.CheckedChanged += (_, _) => EvaluateBinding();
         root.Controls.Add(_advancedPanel, 0, 5);
 
         // Buttons.
@@ -188,37 +203,105 @@ public sealed class KeyBindingEditorForm : Form
     {
         _capturedChar = e.Char;
 
-        if (e.Char.HasValue)
+        if (!e.Char.HasValue)
         {
-            var ch = e.Char.Value;
-            var existing = "";
-            if (_overrides.TryLookup(ch, out var cur))
-                existing = $" — currently overridden to ({cur.Row},{cur.Col}) {(cur.MzShift ? "shifted" : "unshifted")}";
-            else if (CharMap.Defaults.TryGetValue(ch, out var def))
-                existing = $" — default maps to ({def.Row},{def.Col}) {(def.MzShift ? "shifted" : "unshifted")}";
-            else
-                existing = " — no existing binding";
-
-            _status.Text = $"Will bind '{ch}' (U+{(int)ch:X4}) → ({Row},{Col}){existing}.";
-            _status.ForeColor = SystemColors.ControlText;
-            _phaseBNote.Visible = false;
-            _saveBtn.Enabled = true;
-        }
-        else
-        {
+            // Non-character VK: defer to Phase B (P2-6).
             _status.Text = "";
             _phaseBNote.Text =
                 "Non-character keys (modifiers, function keys, cursors, Enter, Esc, Tab) edit " +
                 "the Key Overrides layer, which arrives in Phase B. For now, hand-edit the " +
                 "[KeyOverrides] section in settings.ini.";
             _phaseBNote.Visible = true;
+            _conflict = null;
             _saveBtn.Enabled = false;
+            return;
         }
+
+        EvaluateBinding();
+    }
+
+    /// <summary>
+    /// Recomputes status text, conflict state, and Save enablement from
+    /// the current <see cref="_capturedChar"/> and shift checkbox. Runs
+    /// on every char capture and whenever the shift toggle flips — both
+    /// can turn a no-op rebind into a conflict and vice-versa.
+    /// </summary>
+    private void EvaluateBinding()
+    {
+        if (_capturedChar is not char ch)
+        {
+            _conflict = null;
+            _saveBtn.Enabled = false;
+            return;
+        }
+
+        // A prior non-char capture may have shown the Phase-B note; a
+        // subsequent char capture must clear it.
+        _phaseBNote.Visible = false;
+
+        bool targetShift = _shiftCheck.Checked;
+
+        CharMap.Press? existing = null;
+        bool fromOverride = false;
+        if (_overrides.TryLookup(ch, out var cur))
+        {
+            existing = cur;
+            fromOverride = true;
+        }
+        else if (CharMap.Defaults.TryGetValue(ch, out var def))
+        {
+            existing = def;
+            fromOverride = false;
+        }
+
+        bool isConflict = existing.HasValue &&
+            (existing.Value.Row != Row
+             || existing.Value.Col != Col
+             || existing.Value.MzShift != targetShift);
+
+        _conflict = isConflict ? new ConflictInfo(existing!.Value, fromOverride) : null;
+
+        string suffix;
+        if (!existing.HasValue)
+        {
+            suffix = " — no existing binding.";
+        }
+        else if (isConflict)
+        {
+            string src = fromOverride ? "currently overridden to" : "default maps to";
+            var ex = existing.Value;
+            suffix = $" — ⚠ {src} ({ex.Row},{ex.Col}) {(ex.MzShift ? "shifted" : "unshifted")}.";
+        }
+        else
+        {
+            suffix = fromOverride
+                ? " — already bound here (re-saving same override)."
+                : " — matches the built-in default.";
+        }
+
+        _status.Text = $"Will bind '{ch}' (U+{(int)ch:X4}) → ({Row},{Col}){suffix}";
+        _status.ForeColor = isConflict ? Color.DarkOrange : SystemColors.ControlText;
+        _saveBtn.Enabled = true;
     }
 
     private void OnSave()
     {
         if (_capturedChar is not char ch) return;
+
+        if (_conflict is ConflictInfo c)
+        {
+            var ex = c.Existing;
+            string src = c.FromOverride ? "currently bound (override)" : "currently bound (default)";
+            var result = MessageBox.Show(this,
+                $"PC '{ch}' is {src} to MZ slot ({ex.Row},{ex.Col}) " +
+                $"{(ex.MzShift ? "shifted" : "unshifted")}.\n\n" +
+                $"Replace with ({Row},{Col}) {(_shiftCheck.Checked ? "shifted" : "unshifted")}?",
+                "Conflict — replace existing binding?",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning);
+            if (result != DialogResult.Yes) return;
+        }
+
         _overrides.Set(ch, new CharMap.Press(Row, Col, _shiftCheck.Checked));
         DialogResult = DialogResult.OK;
         Close();

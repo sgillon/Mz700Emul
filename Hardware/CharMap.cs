@@ -88,6 +88,14 @@ public static class CharMap
         // mapped to (5,0) shifted which is MZ shift-8 and produces `(`.
         ['*'] = new(0, 1, true),
 
+        // Up-arrow glyph (unshifted) and tilde (shifted) on the digit
+        // row's "up-arrow" key between `-` and `\`. Slot (6,6) — picked
+        // because it's the unassigned row-6 position between (6,5)='-'
+        // and (6,7)='\'. Distinct from the cursor-up VK at (7,5), which
+        // is a non-printable cursor control.
+        ['↑'] = new(6, 6, false), // ↑
+        ['~']      = new(6, 6, true),
+
         // Square brackets and curly braces — row 1 of the matrix carries
         // these alongside Y/Z (verified against ROM tables: unshifted $54
         // / $52 = `[` / `]`; shifted $40 / $BC = `{` / `}`).

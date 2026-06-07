@@ -171,7 +171,8 @@ Topic-by-topic guides live under [`docs/usage/`](docs/usage/):
 - [HID Diagnostic](docs/usage/hid-diagnostic.md) — live view of
   host keyboard / joystick input and the resolved MZ-700 matrix state.
 - [Keyboard](docs/usage/keyboard.md) — how host keystrokes are mapped
-  to the MZ-700 matrix; loading `.bas` source files.
+  to the MZ-700 matrix; per-key editor in Settings; Font Sheet for
+  GRAPH glyphs; Import / Export `.mzkbd`; loading `.bas` source files.
 - [Joystick](docs/usage/joystick.md) — MZ-1X03 emulation driven from
   any Windows-recognised game controller.
 - [Hardware notes](docs/usage/hardware-notes.md) — MZ-700 hardware
