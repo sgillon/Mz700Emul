@@ -93,6 +93,7 @@ public sealed class FontSheetForm : Form
             g.DrawString($"{c:X}", hdrFont, hdrBrush, MarginPx + c * CellPx + 2, yOffset - 14);
         g.DrawString($"Bank {bank}", hdrFont, hdrBrush, 2, yOffset - 14);
 
+        using var reachablePen = new Pen(Color.MediumSeaGreen, 1f);
         for (int r = 0; r < RowsPerBank; r++)
         {
             int cellY = yOffset + r * CellPx;
@@ -100,8 +101,14 @@ public sealed class FontSheetForm : Form
             for (int c = 0; c < CellsPerRow; c++)
             {
                 byte code = (byte)(r * CellsPerRow + c);
+                int cellX = MarginPx + c * CellPx;
                 var glyph = _machine.Video.GetGlyph(code, bank, GlyphScale);
-                g.DrawImageUnscaled(glyph, MarginPx + c * CellPx, cellY);
+                g.DrawImageUnscaled(glyph, cellX, cellY);
+                // Outline cells the keyboard can produce in this bank,
+                // per RomKeyTables. Helps the user pick a cell that will
+                // actually type without having to guess.
+                if (_machine.KeyTables.FindByDisplayCode(code, bank) != null)
+                    g.DrawRectangle(reachablePen, cellX, cellY, CellPx - 1, CellPx - 1);
             }
         }
     }
@@ -113,12 +120,43 @@ public sealed class FontSheetForm : Form
             _statusLabel.Text = "Click a glyph cell to type it.";
             return;
         }
-        var slot = _machine.KeyTables.FindByDisplayCode(code);
+        var slot = _machine.KeyTables.FindByDisplayCode(code, bank);
         if (slot is null)
         {
             _statusLabel.Text = $"Bank {bank} code ${code:X2} isn't reachable from the keyboard.";
             return;
         }
+
+        // Mode check: clicking an ALPHA cell while the machine is in
+        // GRAPH mode (or vice versa) would press a slot whose lookup is
+        // mode-dependent and produce the wrong glyph. Refuse rather than
+        // silently mistype.
+        bool inGraphMode = (_machine.Mem.Read(0x0060) & 0x10) != 0;
+        bool wantGraphMode = bank == RomKeyTables.GraphBank;
+        if (inGraphMode != wantGraphMode)
+        {
+            string need = wantGraphMode ? "GRAPH" : "ALPHA";
+            _statusLabel.Text =
+                $"Switch the machine to {need} mode first (press the {need} key) to type this glyph.";
+            return;
+        }
+
+        // GRAPH-bank click-to-type is parked — see docs/usage/keyboard.md.
+        // The matrix press lands the right byte in VRAM but BASIC's input
+        // handler doesn't set the attribute byte to bank 1 via this path,
+        // so the byte renders as the bank-0 glyph at that code instead of
+        // the intended graphic. Investigation 2026-06-07 narrowed it to
+        // the auto-typer-vs-PC-keystroke difference without finding the
+        // missing state. Outline stays so the reachable set is visible,
+        // but clicking is suppressed until the attribute write is solved.
+        if (bank == RomKeyTables.GraphBank)
+        {
+            _statusLabel.Text =
+                "Bank 1 click-to-type is a known limitation — the glyph lands "
+                + "but with the wrong attribute. See docs/usage/keyboard.md.";
+            return;
+        }
+
         _machine.Keyboard.TypePress(new CharMap.Press(slot.Value.Row, slot.Value.Col, slot.Value.MzShift));
         string shiftTxt = slot.Value.MzShift ? "shift+" : "";
         _statusLabel.Text =

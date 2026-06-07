@@ -71,8 +71,17 @@ The MZ-700 character ROM contains graphic and kana glyphs that have no
 PC-key equivalent. When the machine enters GRAPH mode (press the GRAPH
 key — defaults to **F11**), the **Font Sheet** window pops up
 automatically. It shows all 512 glyphs (two banks of 256) at 3× scale.
-Click a glyph to type its display code into the emulator via the
-auto-typer.
+Reachable cells (the keyboard tables can produce them) are outlined in
+green.
+
+Click a bank-0 (top) glyph in ALPHA mode to type it. Bank-1 (bottom)
+click-to-type is currently a **known limitation** — the byte lands in
+VRAM correctly but the attribute byte is not switched to bank 1, so the
+glyph renders as its bank-0 equivalent rather than the intended graphic.
+Investigation narrowed it to a difference between PC-keystroke and
+auto-typer input paths inside S-BASIC's input handler; the green
+outlines still mark the *reachable* set so the data is preserved for
+when this is fixed. Browse-mode (reading the GRAPH glyphs) still works.
 
 The Font Sheet is also always available from **View → Font Sheet…**
 (**Ctrl+G**) so you can browse glyphs in ALPHA mode too.

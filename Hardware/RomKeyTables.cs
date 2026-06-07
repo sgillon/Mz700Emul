@@ -5,23 +5,36 @@ namespace MZ700Emul.Hardware;
 /// <summary>
 /// Reverse lookup from MZ-700 display code to the (row, col, MzShift)
 /// slot that produces it on the keyboard. Built by reading the monitor
-/// ROM's key-translation tables at $0BEA (unshifted) and $0C2A (shifted).
+/// ROM's four key-translation tables, one per mode/shift combination:
+/// <list type="bullet">
+///   <item>$0BEA — ALPHA unshifted (bank 0)</item>
+///   <item>$0C2A — ALPHA shifted   (bank 0)</item>
+///   <item>$0C6A — GRAPH unshifted (bank 1) — discovered 2026-06-07</item>
+///   <item>$0CAA — GRAPH shifted   (bank 1) — discovered 2026-06-07</item>
+/// </list>
 ///
-/// Scan formula from the ROM scan routine at $0A50:
-/// <c>index = row*8 + (7 - col)</c>. Each table is 64 bytes covering
-/// rows 0–7 — rows 8 and 9 hold modifier and function keys that don't
-/// produce display codes directly.
+/// Each table is 64 bytes covering rows 0–7. Scan formula from the ROM's
+/// scan routine at $0A50: <c>index = row*8 + (7 - col)</c>. Rows 8 and 9
+/// hold modifier and function keys that don't produce display codes
+/// directly. The four tables are dispatched at runtime via
+/// (mode_flag &lt;&lt; 6) offset from the base — the same mode byte at
+/// $1170 the ROM uses for the keyboard handler's lookup.
 ///
 /// Unshifted entries win on duplicates so the simpler keystroke is the
-/// canonical way to reach a given glyph.
+/// canonical way to reach a given glyph. Banks are independent.
 /// </summary>
 public sealed class RomKeyTables
 {
-    private const int UnshiftedTableOffset = 0x0BEA;
-    private const int ShiftedTableOffset = 0x0C2A;
+    public const int AlphaBank = 0;
+    public const int GraphBank = 1;
+
+    private const int AlphaUnshiftedOffset = 0x0BEA;
+    private const int AlphaShiftedOffset   = 0x0C2A;
+    private const int GraphUnshiftedOffset = 0x0C6A;
+    private const int GraphShiftedOffset   = 0x0CAA;
     private const int TableLength = 64;
 
-    private readonly Dictionary<byte, (int Row, int Col, bool MzShift)> _byCode = new();
+    private readonly Dictionary<(byte Code, int Bank), (int Row, int Col, bool MzShift)> _byCode = new();
 
     /// <summary>
     /// (Re)populate the inverse map from a freshly-loaded monitor ROM.
@@ -37,29 +50,35 @@ public sealed class RomKeyTables
     public void Build(byte[] monitorRom)
     {
         _byCode.Clear();
-        for (int i = 0; i < TableLength && UnshiftedTableOffset + i < monitorRom.Length; i++)
+        LoadTable(monitorRom, AlphaUnshiftedOffset, AlphaBank, mzShift: false);
+        LoadTable(monitorRom, AlphaShiftedOffset,   AlphaBank, mzShift: true);
+        LoadTable(monitorRom, GraphUnshiftedOffset, GraphBank, mzShift: false);
+        LoadTable(monitorRom, GraphShiftedOffset,   GraphBank, mzShift: true);
+    }
+
+    private void LoadTable(byte[] rom, int offset, int bank, bool mzShift)
+    {
+        for (int i = 0; i < TableLength && offset + i < rom.Length; i++)
         {
             int row = i / 8;
             int col = 7 - (i % 8);
             if (SpecialKeyMap.SlotLabels.ContainsKey((row, col))) continue;
-            byte code = monitorRom[UnshiftedTableOffset + i];
-            if (!_byCode.ContainsKey(code)) _byCode[code] = (row, col, false);
-        }
-        for (int i = 0; i < TableLength && ShiftedTableOffset + i < monitorRom.Length; i++)
-        {
-            int row = i / 8;
-            int col = 7 - (i % 8);
-            if (SpecialKeyMap.SlotLabels.ContainsKey((row, col))) continue;
-            byte code = monitorRom[ShiftedTableOffset + i];
-            if (!_byCode.ContainsKey(code)) _byCode[code] = (row, col, true);
+            byte code = rom[offset + i];
+            var key = (code, bank);
+            if (!_byCode.ContainsKey(key)) _byCode[key] = (row, col, mzShift);
         }
     }
 
-    /// <summary>Returns the slot that produces the given display code, or null if no slot does.</summary>
-    public (int Row, int Col, bool MzShift)? FindByDisplayCode(byte code) =>
-        _byCode.TryGetValue(code, out var slot) ? slot : null;
+    /// <summary>
+    /// Returns the slot that produces the given display code in the
+    /// requested bank (0 = ALPHA, 1 = GRAPH), or null if no slot does.
+    /// Bank matters because the same matrix slot produces different
+    /// display codes in ALPHA vs GRAPH mode.
+    /// </summary>
+    public (int Row, int Col, bool MzShift)? FindByDisplayCode(byte code, int bank = AlphaBank) =>
+        _byCode.TryGetValue((code, bank), out var slot) ? slot : null;
 
     public int Count => _byCode.Count;
 
-    public IEnumerable<KeyValuePair<byte, (int Row, int Col, bool MzShift)>> All => _byCode;
+    public IEnumerable<KeyValuePair<(byte Code, int Bank), (int Row, int Col, bool MzShift)>> All => _byCode;
 }
