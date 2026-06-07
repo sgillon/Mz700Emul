@@ -21,11 +21,6 @@ namespace MZ700Emul;
 /// <see cref="Applied"/> to push live changes (display scale, joystick
 /// button bindings) into the running emulator; ROM-path changes are
 /// next picked up on the following reset.
-///
-/// Hardware reference images embedded under <c>_hardwareimages\</c> are
-/// loaded by name (see <see cref="LoadEmbeddedImage"/>). Tabs that have
-/// an image render a 200 px image column on the right; tabs without one
-/// render full-width.
 /// </summary>
 public sealed class SettingsForm : Form
 {
@@ -36,11 +31,6 @@ public sealed class SettingsForm : Form
     // Keyboard tab — diagram is the primary view (P2-7); matrix grid
     // lives behind an Advanced expander.
     private MzKeyboardDiagram? _kbdDiagram;
-    private Button? _advancedKbdBtn;
-    private Panel? _advancedKbdPanel;
-    private KeyboardMatrixGrid? _kbdGrid;
-    private System.Windows.Forms.Timer? _kbdGridTimer;
-    private ListView? _overridesList;
 
     // Display
     private readonly RadioButton _rb1x = new() { Text = "&1× (320×200)", AutoSize = true };
@@ -72,22 +62,21 @@ public sealed class SettingsForm : Form
         Text = "Settings";
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
-        // Grew (was 640×380) to fit the 10×8 matrix on the Keyboard tab
-        // plus the overrides list below it. Other tabs are short and
-        // gain whitespace — acceptable trade. Sized so the matrix
-        // (678 tall) plus a ~150 px overrides list plus button row and
-        // tab chrome all land inside the form.
-        ClientSize = new Size(740, 920);
+        // Sized to the Keyboard tab's natural content (caption + 210 px
+        // diagram + Export/Import row + Advanced settings button); the
+        // matrix grid + overrides list live in AdvancedKeyboardForm now,
+        // so the main dialog no longer has to budget room for them.
+        ClientSize = new Size(740, 400);
         MinimizeBox = false;
         MaximizeBox = false;
         ShowInTaskbar = false;
         KeyPreview = true;
 
         var tabs = new TabControl { Dock = DockStyle.Fill };
-        tabs.TabPages.Add(BuildDisplayTab());
         tabs.TabPages.Add(BuildRomsTab());
-        tabs.TabPages.Add(BuildJoystickTab());
+        tabs.TabPages.Add(BuildDisplayTab());
         tabs.TabPages.Add(BuildKeyboardTab());
+        tabs.TabPages.Add(BuildJoystickTab());
 
         var buttonRow = BuildButtonRow();
 
@@ -129,7 +118,7 @@ public sealed class SettingsForm : Form
         stack.Controls.Add(_rb1x);
         stack.Controls.Add(_rb2x);
         stack.Controls.Add(_rb3x);
-        return BuildTabPage("Display", stack, image: null);
+        return BuildTabPage("Display", stack);
     }
 
     private TabPage BuildRomsTab()
@@ -163,7 +152,7 @@ public sealed class SettingsForm : Form
         grid.Controls.Add(hint, 0, 3);
         grid.SetColumnSpan(hint, 4);
 
-        return BuildTabPage("ROMs", grid, image: null);
+        return BuildTabPage("ROMs", grid);
     }
 
     private void AddRomRow(TableLayoutPanel grid, int row, string label, TextBox textBox, Label statusLabel,
@@ -217,7 +206,7 @@ public sealed class SettingsForm : Form
         grid.Controls.Add(hint, 0, 3);
         grid.SetColumnSpan(hint, 3);
 
-        return BuildTabPage("Joystick", grid, image: LoadEmbeddedImage("MZ-1X03.png"));
+        return BuildTabPage("Joystick", grid);
     }
 
     private void AddJoystickRow(TableLayoutPanel grid, int row, string label, NumericUpDown spinner)
@@ -253,16 +242,14 @@ public sealed class SettingsForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 5,
+            RowCount = 4,
             Padding = new Padding(8),
-            AutoScroll = true,
         };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));        // caption
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 210f));  // diagram
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));        // advanced button
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));        // advanced panel
-        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));   // overrides list
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));        // export / import row
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));        // advanced settings button
 
         layout.Controls.Add(new Label
         {
@@ -279,106 +266,15 @@ public sealed class SettingsForm : Form
         RefreshKeyboardDiagramLabels();
         layout.Controls.Add(_kbdDiagram, 0, 1);
 
-        _advancedKbdBtn = new Button
-        {
-            Text = "Advanced — matrix grid ▾",
-            AutoSize = true,
-            FlatStyle = FlatStyle.Flat,
-            TextAlign = ContentAlignment.MiddleLeft,
-            Margin = new Padding(0, 8, 0, 4),
-        };
-        _advancedKbdBtn.FlatAppearance.BorderSize = 0;
-        _advancedKbdBtn.Click += (_, _) => ToggleAdvancedKbd();
-        layout.Controls.Add(_advancedKbdBtn, 0, 2);
-
-        _advancedKbdPanel = new Panel
-        {
-            AutoSize = true,
-            Visible = false,
-        };
-        if (_machine != null)
-        {
-            _kbdGrid = new KeyboardMatrixGrid(_machine)
-            {
-                Anchor = AnchorStyles.Top | AnchorStyles.Left,
-                Margin = new Padding(0),
-            };
-            _kbdGrid.CellClicked += OnKeyboardCellClicked;
-            _advancedKbdPanel.Controls.Add(_kbdGrid);
-
-            // Tick at 10 Hz so the live highlight tracks if anything
-            // happens to assert matrix bits while the dialog is open
-            // (auto-typer mid-sequence, etc.). Skip the invalidate when
-            // the panel is collapsed — no point repainting an offscreen
-            // control.
-            _kbdGridTimer = new System.Windows.Forms.Timer { Interval = 100 };
-            _kbdGridTimer.Tick += (_, _) =>
-            {
-                if (_advancedKbdPanel?.Visible == true) _kbdGrid?.Invalidate();
-            };
-            Load += (_, _) => _kbdGridTimer.Start();
-            FormClosed += (_, _) =>
-            {
-                _kbdGridTimer.Stop();
-                _kbdGridTimer.Dispose();
-            };
-        }
-        else
-        {
-            _advancedKbdPanel.Controls.Add(new Label
-            {
-                Text = "Matrix grid unavailable — emulator instance not provided.",
-                AutoSize = true,
-                ForeColor = SystemColors.GrayText,
-            });
-        }
-        layout.Controls.Add(_advancedKbdPanel, 0, 3);
-
-        // Overrides panel — header + ListView. Aggregates both layers
-        // (CharMap chars + KeyOverride VKs) so the user sees everything
-        // currently in effect without opening settings.ini.
-        var listPanel = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            ColumnCount = 1,
-            RowCount = 2,
-            Margin = new Padding(0, 8, 0, 0),
-        };
-        listPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-        listPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));   // header row (label + import/export)
-        listPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
-
-        // Header row: caption on the left, Export / Import buttons on
-        // the right. Three columns — label (AutoSize), spacer (100%),
-        // buttons (AutoSize) — so both the label and the button group
-        // get their natural width and the spacer eats whatever's left.
-        var headerRow = new TableLayoutPanel
-        {
-            Dock = DockStyle.Top,
-            ColumnCount = 3,
-            RowCount = 1,
-            AutoSize = true,
-            Margin = new Padding(0, 0, 0, 4),
-        };
-        headerRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        headerRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-        headerRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        headerRow.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-
-        headerRow.Controls.Add(new Label
-        {
-            Text = "Active overrides (summary):",
-            AutoSize = true,
-            ForeColor = SystemColors.GrayText,
-            Anchor = AnchorStyles.Left | AnchorStyles.Bottom,
-        }, 0, 0);
-
+        // Export / Import row — operates on the whole mapping, so it
+        // stays in the primary view rather than under Advanced.
         var ioButtons = new FlowLayoutPanel
         {
             FlowDirection = FlowDirection.LeftToRight,
             AutoSize = true,
             WrapContents = false,
-            Margin = new Padding(0),
+            Anchor = AnchorStyles.Right,
+            Margin = new Padding(0, 8, 0, 4),
         };
         var exportBtn = new Button { Text = "Export…", Width = 90 };
         var importBtn = new Button { Text = "Import…", Width = 90 };
@@ -386,28 +282,29 @@ public sealed class SettingsForm : Form
         importBtn.Click += (_, _) => OnImportMzKbd();
         ioButtons.Controls.Add(exportBtn);
         ioButtons.Controls.Add(importBtn);
-        headerRow.Controls.Add(ioButtons, 2, 0);
-        listPanel.Controls.Add(headerRow, 0, 0);
+        layout.Controls.Add(ioButtons, 0, 2);
 
-        _overridesList = new ListView
+        var advancedBtn = new Button
         {
-            Dock = DockStyle.Fill,
-            View = View.Details,
-            FullRowSelect = true,
-            GridLines = true,
-            HeaderStyle = ColumnHeaderStyle.Nonclickable,
-            MultiSelect = false,
-            Height = 140,
+            Text = "Advanced settings…",
+            AutoSize = true,
+            Anchor = AnchorStyles.Left,
+            Margin = new Padding(0, 4, 0, 4),
         };
-        _overridesList.Columns.Add("Layer",      80);
-        _overridesList.Columns.Add("PC trigger", 160);
-        _overridesList.Columns.Add("MZ slot",    80);
-        _overridesList.Columns.Add("Shift",      100);
-        PopulateOverridesList();
-        listPanel.Controls.Add(_overridesList, 0, 1);
+        advancedBtn.Click += (_, _) => OpenAdvancedKeyboard();
+        layout.Controls.Add(advancedBtn, 0, 3);
 
-        layout.Controls.Add(listPanel, 0, 4);
-        return BuildTabPage("Keyboard", layout, image: null);
+        return BuildTabPage("Keyboard", layout);
+    }
+
+    private void OpenAdvancedKeyboard()
+    {
+        using var dlg = new AdvancedKeyboardForm(
+            _machine, _settings.CharMapOverrides, _settings.KeyOverrides);
+        dlg.ShowDialog(this);
+        // Edits flow into the shared override instances; refresh the
+        // diagram so any changes made via the matrix grid show through.
+        RefreshKeyboardDiagramLabels();
     }
 
     private void OnExportMzKbd()
@@ -506,21 +403,26 @@ public sealed class SettingsForm : Form
         // Refresh the surface controls so the change is visible
         // immediately. Persistence still waits for Apply / OK.
         RefreshKeyboardDiagramLabels();
-        _kbdGrid?.RefreshBindings();
-        PopulateOverridesList();
-    }
-
-    private void ToggleAdvancedKbd()
-    {
-        if (_advancedKbdPanel == null || _advancedKbdBtn == null) return;
-        _advancedKbdPanel.Visible = !_advancedKbdPanel.Visible;
-        _advancedKbdBtn.Text = _advancedKbdPanel.Visible
-            ? "Advanced — matrix grid ▴"
-            : "Advanced — matrix grid ▾";
     }
 
     private void OnKeyboardDiagramKeyClicked(object? sender, KeyDiagramClickedEventArgs e)
     {
+        // MZ Shift is permanently wired to PC Shift via the Keyboard
+        // modifier path (concurrent assertion is needed so Shift+1 → '!'
+        // produces the character bit and the shift bit simultaneously).
+        // Surfacing the editor would imply it's rebindable; explain instead.
+        if (e.Key.Row == 8 && e.Key.Col == 0)
+        {
+            MessageBox.Show(this,
+                "MZ Shift is permanently bound to your PC Shift key.\n\n" +
+                "Unlike the other keys, Shift is held alongside whatever else " +
+                "you press (so Shift+1 produces '!'), which needs the MZ shift " +
+                "bit and the character bit asserted at the same time. That's " +
+                "handled by a dedicated path and isn't rebindable from here.",
+                "MZ Shift", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
         // Editor mutates the override layers directly — change is live
         // for subsequent emulator keystrokes. Persistence still waits
         // for this dialog's Apply / OK.
@@ -528,8 +430,6 @@ public sealed class SettingsForm : Form
             e.Key, _settings.CharMapOverrides, _settings.KeyOverrides);
         editor.ShowDialog(this);
         RefreshKeyboardDiagramLabels();
-        _kbdGrid?.RefreshBindings();
-        PopulateOverridesList();
     }
 
     private void RefreshKeyboardDiagramLabels()
@@ -587,65 +487,6 @@ public sealed class SettingsForm : Form
         return true;
     }
 
-    private void OnKeyboardCellClicked(object? sender, CellClickedEventArgs e)
-    {
-        // Matrix-grid click path (Advanced view) still uses the char-only
-        // editor — the matrix grid surfaces individual (row, col, shift)
-        // slots, which the char layer is keyed by. Fixed-label slots are
-        // routed through the diagram instead.
-        using var editor = new KeyBindingEditorForm(
-            e.Row, e.Col, e.MzShift, _settings.CharMapOverrides);
-        if (editor.ShowDialog(this) != DialogResult.OK) return;
-        _kbdGrid?.RefreshBindings();
-        RefreshKeyboardDiagramLabels();
-        PopulateOverridesList();
-    }
-
-    private void PopulateOverridesList()
-    {
-        if (_overridesList == null) return;
-        _overridesList.Items.Clear();
-
-        foreach (var kv in _settings.CharMapOverrides.All.OrderBy(k => (int)k.Key))
-        {
-            var p = kv.Value;
-            _overridesList.Items.Add(new ListViewItem(new[]
-            {
-                "CharMap",
-                $"'{kv.Key}' (U+{(int)kv.Key:X4})",
-                $"({p.Row},{p.Col})",
-                p.MzShift ? "shifted" : "unshifted",
-            }));
-        }
-
-        foreach (var kv in _settings.KeyOverrides.All.OrderBy(k => k.Key.ToString()))
-        {
-            var b = kv.Value;
-            var shiftLabel = b.MzShift switch
-            {
-                true  => "shifted",
-                false => "unshifted",
-                _     => "pass-through",
-            };
-            _overridesList.Items.Add(new ListViewItem(new[]
-            {
-                "Key",
-                kv.Key.ToString(),
-                $"({b.Row},{b.Col})",
-                shiftLabel,
-            }));
-        }
-
-        if (_overridesList.Items.Count == 0)
-        {
-            var empty = new ListViewItem(new[] { "—", "(no overrides set)", "—", "—" })
-            {
-                ForeColor = SystemColors.GrayText,
-            };
-            _overridesList.Items.Add(empty);
-        }
-    }
-
     private void CaptureButtonFor(NumericUpDown target)
     {
         if (_joystickInput == null) return;
@@ -658,35 +499,11 @@ public sealed class SettingsForm : Form
 
     // -- Tab page with optional right-docked image ----------------------
 
-    private static TabPage BuildTabPage(string text, Control content, Image? image)
+    private static TabPage BuildTabPage(string text, Control content)
     {
         var page = new TabPage(text);
-        if (image == null)
-        {
-            content.Dock = DockStyle.Fill;
-            page.Controls.Add(content);
-            return page;
-        }
-
-        var layout = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            ColumnCount = 2,
-            RowCount = 1,
-        };
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 200f));
-        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
         content.Dock = DockStyle.Fill;
-        layout.Controls.Add(content, 0, 0);
-        layout.Controls.Add(new PictureBox
-        {
-            Image = image,
-            SizeMode = PictureBoxSizeMode.Zoom,
-            Dock = DockStyle.Fill,
-            Margin = new Padding(6),
-        }, 1, 0);
-        page.Controls.Add(layout);
+        page.Controls.Add(content);
         return page;
     }
 
@@ -882,31 +699,6 @@ public sealed class SettingsForm : Form
             : full;
     }
 
-    // -- Embedded image loader ------------------------------------------
-
-    private static Image? LoadEmbeddedImage(string filename)
-    {
-        try
-        {
-            var asm = typeof(SettingsForm).Assembly;
-            var match = asm.GetManifestResourceNames()
-                .FirstOrDefault(n => n.EndsWith(filename, StringComparison.OrdinalIgnoreCase));
-            if (match == null) return null;
-            using var s = asm.GetManifestResourceStream(match);
-            if (s == null) return null;
-            // Image.FromStream requires the source stream to outlive the
-            // Image — copy into a memory stream we keep open implicitly
-            // via the Image's internal reference.
-            var ms = new MemoryStream();
-            s.CopyTo(ms);
-            ms.Position = 0;
-            return Image.FromStream(ms);
-        }
-        catch
-        {
-            return null;
-        }
-    }
 
     private static int Clamp(int value, int min, int max) =>
         value < min ? min : value > max ? max : value;

@@ -45,7 +45,6 @@ public sealed class MainForm : Form
     // GRAPH mode is effectively unusable without it.
     private bool _wasGraphMode;
     private KeyboardMatrixForm? _matrixForm;
-    private MzKeyboardDiagramForm? _diagramForm;
 
     public MainForm(string? cassettePath, bool autoLoadBasic, string? dumpPath = null)
     {
@@ -174,10 +173,7 @@ public sealed class MainForm : Form
         debug.DropDownItems.Add(new ToolStripMenuItem("&Debugger…", null, (_, _) => OpenDebugger()) { ShortcutKeys = Keys.Control | Keys.D });
         debug.DropDownItems.Add(new ToolStripMenuItem("&Memory Viewer…", null, (_, _) => OpenMemoryViewer()) { ShortcutKeys = Keys.Control | Keys.M });
         debug.DropDownItems.Add(new ToolStripMenuItem("&HID Diagnostic…", null, (_, _) => OpenHidDiag()) { ShortcutKeys = Keys.Control | Keys.H });
-        debug.DropDownItems.Add(new ToolStripMenuItem("&Font Sheet…", null, (_, _) => OpenFontSheet()));
         debug.DropDownItems.Add(new ToolStripMenuItem("Keyboard &Matrix…", null, (_, _) => OpenKeyboardMatrix()));
-        debug.DropDownItems.Add(new ToolStripMenuItem("MZ Keyboard &Diagram…", null, (_, _) => OpenKeyboardDiagram()));
-        debug.DropDownItems.Add(new ToolStripMenuItem("&Key Capture Test…", null, (_, _) => OpenKeyCaptureTest()));
         debug.DropDownItems.Add(new ToolStripSeparator());
         debug.DropDownItems.Add(new ToolStripMenuItem("Run &Z80 Test (ZEXDOC/ZEXALL)…", null, (_, _) => OpenZ80Test()));
         menu.Items.Add(debug);
@@ -866,12 +862,6 @@ public sealed class MainForm : Form
         _fontSheet.BringToFront();
     }
 
-    private void OpenKeyCaptureTest()
-    {
-        using var f = new KeyCaptureTestForm();
-        f.ShowDialog(this);
-    }
-
     private void OpenKeyboardMatrix()
     {
         if (_matrixForm == null || _matrixForm.IsDisposed)
@@ -881,15 +871,6 @@ public sealed class MainForm : Form
         // steals focus from the emulator; we want to watch the highlight
         // pulse while typing into the main window.
         _matrixForm.Show();
-    }
-
-    private void OpenKeyboardDiagram()
-    {
-        if (_diagramForm == null || _diagramForm.IsDisposed)
-            _diagramForm = new MzKeyboardDiagramForm();
-        _diagramForm.SetLabels(_settings.CharMapOverrides, _machine.Keyboard.Overrides);
-        _diagramForm.Owner = this;
-        _diagramForm.Show();
     }
 
     private void OpenHidDiag()

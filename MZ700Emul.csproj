@@ -39,13 +39,11 @@
     <None Remove="Z80Core/**/*" />
   </ItemGroup>
 
-  <!-- Embedded resources for the single-file publish: the joystick
-       reference image shown in the Settings dialog, and the app icon
+  <!-- Embedded resources for the single-file publish: the app icon
        loaded at runtime by Form.Icon. Listed explicitly to avoid
        inadvertently pulling in local working files (e.g. icon source
        PNGs in _hardwareimages/). -->
   <ItemGroup>
-    <EmbeddedResource Include="_hardwareimages\MZ-1X03.png" />
     <!-- MZ700Emul.ico is also embedded as the Win32 resource via
          <ApplicationIcon> above (used by Explorer, taskbar, alt-tab);
          the EmbeddedResource entry lets MainForm load it at runtime
