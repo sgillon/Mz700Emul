@@ -214,7 +214,16 @@ games/           Joystick test program (joytest.bas / .mzf)
 ## Known limitations & imperfections
 
 - MZ-only glyphs (graphics blocks, kana) aren't reachable from a PC
-  keyboard in the current char-driven model — by design.
+  keystroke in the char-driven model — by design. The **Font Sheet**
+  window (View → Font Sheet…, Ctrl+G) bridges most of the gap with a
+  click-to-type catalogue; bank-1 click-to-type has a known
+  attribute-bit gap that's tracked in
+  [docs/usage/keyboard.md](docs/usage/keyboard.md#known-limitations).
+- Keyboard: a handful of parked items (bank-1 click-to-type, MZ-shift
+  assertion race on rapid char input, no Left/Right Ctrl distinction)
+  are listed with full context in
+  [docs/usage/keyboard.md](docs/usage/keyboard.md#known-limitations)
+  and surfaced as a callout on the Settings → Keyboard tab.
 - Sound reproduction isn't quite right. It works well enough to play most games, but sometimes sounds are missing and I'm not confident about the timings.
 - Auto-typed input (BASIC source paste / command auto-load) runs at
   around 6–8 chars/sec — fine for short snippets, slow for long
@@ -224,10 +233,6 @@ games/           Joystick test program (joytest.bas / .mzf)
 
 Items I'd like to come back to (rough priority order):
 
-- **Keyboard-map GUI editor** — expose the PC→MZ character map as a
-  user-editable mapping in the settings dialog, persisted to a file.
-  Slots into the settings dialog scaffolding (Ctrl+S) introduced for
-  Display / ROMs / Joystick.
 - **Direct-jump shortcuts to settings tabs** — once the settings UI
   gets busier, add menu entries that open the dialog already focused
   on a specific tab (e.g. *Settings → Joystick…*) so users don't have
