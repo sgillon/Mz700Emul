@@ -211,11 +211,14 @@ public sealed class AboutForm : Form
 
     private static DateTime GetBuildDate()
     {
+        // Assembly.Location returns "" under PublishSingleFile, so use
+        // the host exe's mtime via AppContext.BaseDirectory. The exe is
+        // re-stamped on every build, so its modified time is a faithful
+        // build-date proxy.
         try
         {
-            var path = typeof(AboutForm).Assembly.Location;
-            if (!string.IsNullOrEmpty(path) && File.Exists(path))
-                return File.GetLastWriteTime(path);
+            var exe = Path.Combine(AppContext.BaseDirectory, "MZ700Emul.exe");
+            if (File.Exists(exe)) return File.GetLastWriteTime(exe);
         }
         catch { /* fall through */ }
         return DateTime.Now;

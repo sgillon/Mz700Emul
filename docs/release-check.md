@@ -14,18 +14,28 @@ a release, update the checklist before fixing the bug.
       or `1Z-013B.mzf` (Sharp copyright — must not be redistributed).
 - [ ] Exe runs on a clean folder (no `settings.ini`) and auto-detects
       the three system files from `roms/` next to it.
+- [ ] Startup matrix validation stays silent — no "Matrix validation
+      drift" MessageBox. (Means `Mz700MatrixReference`, `SpecialKeyMap`,
+      `CharMap`, and `MzKeyboardLayout` all agree.)
 
 ## Keyboard — Monitor prompt
 
 - [ ] Letters A-Z type correctly (no Shift).
 - [ ] Shift + letter gives uppercase reliably — type `SHIFT+P` x10,
-      expect `PPPPPPPPPP` not `PPpPPPpPPP`. (Known regression as of
-      v0.0.7-preview — track but don't block on it.)
+      expect `PPPPPPPPPP` not `PPpPPPpPPP`. (Known shift-race; called
+      out in the Keyboard tab's known-limitations panel and
+      `docs/usage/keyboard.md`. Cosmetic — don't block on it but do
+      regression-check that the rate hasn't got worse.)
 - [ ] Shift + number gives the symbol reliably (`SHIFT+8` x10 → `**********`).
 - [ ] Cursor keys move the cursor.
 - [ ] Backspace deletes; Insert inserts a space.
 - [ ] Enter executes the line.
 - [ ] Esc + Shift breaks a running monitor loop.
+- [ ] **File → Reset** and **Ctrl+R** both leave the monitor at a clean
+      prompt with no stuck CTRL on the matrix. (Regression fix
+      `d2f3493` — before that, Ctrl+R left MZ CTRL asserted at (8, 6)
+      until you released PC Ctrl, because Reset didn't release the
+      matrix bits the host keydown had asserted.)
 
 ## Keyboard — BASIC
 
@@ -60,8 +70,24 @@ a release, update the checklist before fixing the bug.
       and prompts before saving.
 - [ ] Click the **SHIFT** cap → explanatory message appears (SHIFT
       is wired via the modifier path, not slot-bound).
+- [ ] On a clean `settings.ini`, the diagram's per-glyph safety check
+      shows exactly two crimson-outlined keys: the POUND/↓ cap at
+      `(0,5)` (neither glyph reachable) and the AT/' cap at `(1,5)`
+      (the shifted reversed-apostrophe glyph at bank 0 $A4 is
+      deliberately without a PC binding — see the slot comment in
+      `Hardware/Mz700MatrixReference.cs`).
+- [ ] Keyboard tab's **Known limitations** group box at the bottom
+      lists the three parked items (bank-1 click-to-type, MZ-shift
+      race on rapid input, no L/R Ctrl distinction); the
+      `docs/usage/keyboard.md` link opens in the browser.
 - [ ] **Advanced settings…** button opens the resizable child window
-      with the live matrix grid (top) and overrides list (below).
+      with the live matrix grid (top), the **Unbound slots** panel
+      (middle), and the overrides list (below).
+- [ ] Unbound-slot panel on a clean `settings.ini` lists exactly one
+      entry: POUND `(0,5)`. (The AT slot doesn't appear because `@`
+      already binds the slot at the unshifted glyph; the panel works
+      at slot level, not per-shift-state. POUND disappears the moment
+      any override targets that slot.)
 - [ ] **Export…** writes a `.mzkbd` file containing only the user's
       overrides (open in a text editor to verify the two sections).
 - [ ] **Import…** offers Merge / Replace; importing the file you
