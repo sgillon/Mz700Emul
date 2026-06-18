@@ -135,6 +135,14 @@ public static class CharMap
     public static bool TryLookup(char c, out Press press)
     {
         if (Overrides != null && Overrides.TryLookup(c, out press)) return true;
+        // If the user has suppressed this default via the slot editor
+        // (binding a different PC char to the slot it used to point at),
+        // the default no longer fires either.
+        if (Overrides != null && Overrides.IsSuppressed(c))
+        {
+            press = default;
+            return false;
+        }
         return Defaults.TryGetValue(c, out press);
     }
 

@@ -165,6 +165,12 @@ public sealed class Settings
             sb.AppendLine("; char-resolved keystroke path (after host-OS layout / AltGr).");
             sb.AppendLine("; One line per binding:");
             sb.AppendLine(";   <hex-codepoint>=<row>,<col>,<shift>   ; <glyph>");
+            sb.AppendLine("; Or, to suppress a built-in default (so its PC char produces");
+            sb.AppendLine("; nothing on the MZ side):");
+            sb.AppendLine(";   <hex-codepoint>=-                     ; <glyph> (suppressed)");
+            sb.AppendLine("; The slot editor writes a suppression entry automatically when you");
+            sb.AppendLine("; bind a different PC char to an MZ slot that already had a default");
+            sb.AppendLine("; — so the slot still has just one PC binding after Save.");
             sb.AppendLine("; Where:");
             sb.AppendLine(";   <hex-codepoint>  Unicode codepoint of the PC char in 4-digit hex");
             sb.AppendLine(";                    (e.g. 002A = '*'). Hex avoids breaking the INI");

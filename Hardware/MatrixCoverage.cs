@@ -72,7 +72,14 @@ public static class MatrixCoverage
         // holds PC Shift.
         bound.Add((8, 0));
         foreach (var rc in SpecialKeyMap.Map.Values) bound.Add(rc);
-        foreach (var p in CharMap.Defaults.Values) bound.Add((p.Row, p.Col));
+        foreach (var kv in CharMap.Defaults)
+        {
+            // Suppressed defaults don't fire at runtime; treating them as
+            // "bound" would hide a slot the user has deliberately
+            // unwired via the slot editor.
+            if (charOverrides != null && charOverrides.IsSuppressed(kv.Key)) continue;
+            bound.Add((kv.Value.Row, kv.Value.Col));
+        }
         if (charOverrides != null)
             foreach (var kv in charOverrides.All) bound.Add((kv.Value.Row, kv.Value.Col));
         if (keyOverrides != null)

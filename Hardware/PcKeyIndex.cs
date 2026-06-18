@@ -85,6 +85,7 @@ public static class PcKeyIndex
         foreach (var kv in CharMap.Defaults)
         {
             if (overriddenChars.Contains(kv.Key)) continue;
+            if (charOverrides != null && charOverrides.IsSuppressed(kv.Key)) continue;
             AddShiftLabel(slotLabels, kv.Value.Row, kv.Value.Col, kv.Value.MzShift, CharToLabel(kv.Key));
         }
 
@@ -157,6 +158,7 @@ public static class PcKeyIndex
         foreach (var kv in CharMap.Defaults)
         {
             if (overriddenChars.Contains(kv.Key)) continue;
+            if (charOverrides != null && charOverrides.IsSuppressed(kv.Key)) continue;
             var label = CharToLabel(kv.Key);
             // Don't overwrite an earlier entry — first-wins matches the
             // dual-glyph case where 'A' and 'a' share a slot ('A' wins).
@@ -201,6 +203,7 @@ public static class PcKeyIndex
         foreach (var kv in CharMap.Defaults)
         {
             if (overriddenChars.Contains(kv.Key)) continue;
+            if (overrides != null && overrides.IsSuppressed(kv.Key)) continue;
             AddLabel(slotLabels, kv.Value.Row, kv.Value.Col, CharToLabel(kv.Key));
         }
     }

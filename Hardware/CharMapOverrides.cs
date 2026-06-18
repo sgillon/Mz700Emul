@@ -18,19 +18,56 @@ namespace MZ700Emul.Hardware;
 /// Shift state is a definite <c>bool</c> here (no pass-through tri-state
 /// like <see cref="KeyOverride"/>) because by the time a host keystroke
 /// has produced a Unicode char, the OS has already resolved the modifier.
+///
+/// Suppression: in addition to positive overrides, this layer carries a
+/// set of PC chars whose <see cref="CharMap.Defaults"/> entry should be
+/// suppressed (the runtime lookup acts as if the default didn't exist).
+/// Used by the slot editor so that binding PC 'a' to the MZ '1' slot
+/// also clears the original '1'-to-(1,0) default — otherwise both PC
+/// keys would continue to drive the same MZ slot.
 /// </summary>
 public sealed class CharMapOverrides
 {
     private readonly Dictionary<char, CharMap.Press> _map = new();
+    private readonly HashSet<char> _suppressed = new();
 
     public bool TryLookup(char c, out CharMap.Press press) => _map.TryGetValue(c, out press);
 
-    public void Set(char c, CharMap.Press press) => _map[c] = press;
+    /// <summary>
+    /// Setting a positive override for a char also clears any prior
+    /// suppression for it — the slot editor relies on this so rebinding
+    /// a previously-suppressed PC char "wakes it up" automatically.
+    /// </summary>
+    public void Set(char c, CharMap.Press press)
+    {
+        _map[c] = press;
+        _suppressed.Remove(c);
+    }
+
     public void Remove(char c) => _map.Remove(c);
-    public void Clear() => _map.Clear();
+    public void Clear() { _map.Clear(); _suppressed.Clear(); }
     public int Count => _map.Count;
 
     public IEnumerable<KeyValuePair<char, CharMap.Press>> All => _map;
+
+    // ---- Suppression ------------------------------------------------------
+
+    /// <summary>
+    /// Mark a PC char so its <see cref="CharMap.Defaults"/> entry is
+    /// ignored by the runtime lookup. Has no effect if the char isn't
+    /// in Defaults; harmless to call repeatedly.
+    /// </summary>
+    public void Suppress(char c) => _suppressed.Add(c);
+
+    /// <summary>
+    /// Restore a default entry by removing it from the suppression set.
+    /// Idempotent.
+    /// </summary>
+    public void Unsuppress(char c) => _suppressed.Remove(c);
+
+    public bool IsSuppressed(char c) => _suppressed.Contains(c);
+
+    public IEnumerable<char> AllSuppressed => _suppressed;
 
     // ---- INI serialisation -------------------------------------------------
 
@@ -41,20 +78,40 @@ public sealed class CharMapOverrides
     /// <c>#</c>) and Shift is <c>t</c> (assert MZ shift) or <c>f</c>
     /// (clear it). The trailing comment shows the literal glyph when
     /// printable ASCII, purely for hand-editing readability.
+    ///
+    /// Suppressed defaults serialise as <c>HHHH=-   ; '&lt;glyph&gt;' (suppressed)</c>
+    /// and merge into the same codepoint-sorted output stream so the
+    /// section diffs cleanly.
     /// </summary>
-    public IEnumerable<string> SerialiseLines() =>
-        _map.OrderBy(kv => (int)kv.Key)
-            .Select(kv => $"{(int)kv.Key:X4}={kv.Value.Row},{kv.Value.Col},{ShiftChar(kv.Value.MzShift)}{GlyphComment(kv.Key)}");
+    public IEnumerable<string> SerialiseLines()
+    {
+        var positives = _map.Select(kv =>
+            (codepoint: (int)kv.Key,
+             line: $"{(int)kv.Key:X4}={kv.Value.Row},{kv.Value.Col},{ShiftChar(kv.Value.MzShift)}{GlyphComment(kv.Key)}"));
+        var suppressed = _suppressed.Select(c =>
+            (codepoint: (int)c,
+             line: $"{(int)c:X4}=-{GlyphComment(c)}{(GlyphComment(c).Length > 0 ? " (suppressed)" : "   ; (suppressed)")}"));
+        return positives.Concat(suppressed).OrderBy(t => t.codepoint).Select(t => t.line);
+    }
 
     /// <summary>
     /// Parses one INI line (key=value, the comment already stripped by the
     /// caller). Returns true on success and updates the map; false if the
-    /// line can't be decoded (INI is forgiving — silent skip).
+    /// line can't be decoded (INI is forgiving — silent skip). A value of
+    /// <c>-</c> (or whitespace) is read as "suppress this default" — the
+    /// codepoint is added to <see cref="AllSuppressed"/> instead of the
+    /// positive map.
     /// </summary>
     public bool TryParseLine(string keyName, string value)
     {
         if (!int.TryParse(keyName, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var codepoint)) return false;
         if (codepoint < 0 || codepoint > 0xFFFF) return false;
+        var trimmed = value.Trim();
+        if (trimmed == "-")
+        {
+            _suppressed.Add((char)codepoint);
+            return true;
+        }
         var parts = value.Split(',');
         if (parts.Length != 3) return false;
         if (!int.TryParse(parts[0], out var row)) return false;
