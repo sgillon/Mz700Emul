@@ -375,12 +375,30 @@ public sealed class MzKeyEditorForm : Form
     {
         int row = _key.Row!.Value;
         int col = _key.Col!.Value;
+
+        // Clear positive overrides that point at this slot.
         var toRemove = _charOverrides.All
             .Where(kv => kv.Value.Row == row && kv.Value.Col == col && kv.Value.MzShift == mzShift)
             .Select(kv => kv.Key)
             .ToList();
         foreach (var c in toRemove)
             _charOverrides.Remove(c);
+
+        // Restore any CharMap.Defaults entries that pointed at this slot
+        // and were suppressed by a previous Save (slot-replace path in
+        // KeyBindingEditorForm.OnSave). Without this, Reset clears the
+        // override but the slot stays "unbound" because the original
+        // default is still flagged as suppressed.
+        var toUnsuppress = new List<char>();
+        foreach (var def in CharMap.Defaults)
+        {
+            if (!_charOverrides.IsSuppressed(def.Key)) continue;
+            if (def.Value.Row == row && def.Value.Col == col && def.Value.MzShift == mzShift)
+                toUnsuppress.Add(def.Key);
+        }
+        foreach (var c in toUnsuppress)
+            _charOverrides.Unsuppress(c);
+
         RefreshCharSlotLabels();
     }
 
@@ -461,6 +479,7 @@ public sealed class MzKeyEditorForm : Form
         foreach (var kv in CharMap.Defaults)
         {
             if (overridden.Contains(kv.Key)) continue;
+            if (_charOverrides.IsSuppressed(kv.Key)) continue;
             if (kv.Value.Row == row && kv.Value.Col == col && kv.Value.MzShift == mzShift)
                 labels.Add(PrettyChar(kv.Key));
         }
@@ -502,6 +521,17 @@ public sealed class MzKeyEditorForm : Form
         foreach (var kv in _charOverrides.All)
             if (kv.Value.Row == row && kv.Value.Col == col && kv.Value.MzShift == mzShift)
                 return true;
+        // A previous Save may have suppressed CharMap defaults for this
+        // slot without leaving a matching positive override (e.g. the
+        // user moved the binding elsewhere, then opened the slot fresh).
+        // Reset should restore those — so the button needs to be active
+        // whenever any restorable suppression exists at the slot.
+        foreach (var def in CharMap.Defaults)
+        {
+            if (!_charOverrides.IsSuppressed(def.Key)) continue;
+            if (def.Value.Row == row && def.Value.Col == col && def.Value.MzShift == mzShift)
+                return true;
+        }
         return false;
     }
 

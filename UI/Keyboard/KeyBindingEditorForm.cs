@@ -302,7 +302,48 @@ public sealed class KeyBindingEditorForm : Form
             if (result != DialogResult.Yes) return;
         }
 
-        _overrides.Set(ch, new CharMap.Press(Row, Col, _shiftCheck.Checked));
+        bool mzShift = _shiftCheck.Checked;
+        var target = new CharMap.Press(Row, Col, mzShift);
+
+        // Letters are a case-pair on the MZ side — CharMap.Defaults maps
+        // 'A' and 'a' to the same slot, treating the physical PC key as
+        // the unit of binding. Mirror that here: capturing 'a' also routes
+        // 'A' (PC Shift+a), so the user can't be left in a state where
+        // the unshifted PC keystroke goes to the new slot but the shifted
+        // form still drives the old one.
+        var capturedChars = new HashSet<char> { ch };
+        if (char.IsLetter(ch))
+        {
+            if (char.IsLower(ch)) capturedChars.Add(char.ToUpperInvariant(ch));
+            else if (char.IsUpper(ch)) capturedChars.Add(char.ToLowerInvariant(ch));
+        }
+
+        // Slot-replace semantics: the slot is meant to be driven by the
+        // PC char the user just captured (plus its letter case-pair).
+        // Anything else previously pointing at the same (row, col, mzShift)
+        // — whether a CharMap default or a prior override — is cleared so
+        // the slot has a single PC binding after Save. Without this the
+        // override stacks on top of the default and both PC keys drive
+        // the MZ slot, which surprises users editing from the diagram.
+        foreach (var def in CharMap.Defaults)
+        {
+            if (capturedChars.Contains(def.Key)) continue;
+            if (def.Value.Row == Row && def.Value.Col == Col && def.Value.MzShift == mzShift)
+                _overrides.Suppress(def.Key);
+        }
+        var stalePcChars = new List<char>();
+        foreach (var kv in _overrides.All)
+        {
+            if (capturedChars.Contains(kv.Key)) continue;
+            if (kv.Value.Row == Row && kv.Value.Col == Col && kv.Value.MzShift == mzShift)
+                stalePcChars.Add(kv.Key);
+        }
+        foreach (var stale in stalePcChars)
+            _overrides.Remove(stale);
+
+        foreach (var pcChar in capturedChars)
+            _overrides.Set(pcChar, target);
+
         DialogResult = DialogResult.OK;
         Close();
     }
