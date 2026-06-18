@@ -52,10 +52,12 @@ public sealed class Settings
     // Anything in here is consulted FIRST by CharMap.TryLookup.
     public CharMapOverrides CharMapOverrides { get; } = new();
 
-    // Persisted debugger / memory-viewer state. Values of (0,0,0,0)
-    // mean "no saved geometry — fall back to the host's default
-    // positioning on first open." Serialised to [DebuggerWindow] /
-    // [MemoryViewerWindow] / [DebuggerBreakpoints] sections.
+    // Persisted main / debugger / memory-viewer state. Values of
+    // (0,0,0,0) mean "no saved geometry — fall back to the host's
+    // default positioning on first open." For [MainWindow] only X/Y
+    // are restored; Width/Height are driven by the Display scale, so
+    // those fields aren't persisted from the main window.
+    public WindowState MainWindow { get; set; } = new();
     public WindowState DebuggerWindow { get; set; } = new();
     public WindowState MemoryViewerWindow { get; set; } = new();
     public List<int> DebuggerBreakpoints { get; set; } = new();
@@ -96,6 +98,7 @@ public sealed class Settings
                 {
                     foreach (var kv in cm) s.CharMapOverrides.TryParseLine(kv.Key, kv.Value);
                 }
+                s.MainWindow = ReadWindowState(ini, "MainWindow");
                 s.DebuggerWindow = ReadWindowState(ini, "DebuggerWindow");
                 s.MemoryViewerWindow = ReadWindowState(ini, "MemoryViewerWindow");
                 if (ini.TryGetValue("DebuggerBreakpoints", out var bps))
@@ -115,6 +118,7 @@ public sealed class Settings
                 if (!ini.ContainsKey("Joystick")) missingSection = true;
                 if (!ini.ContainsKey("KeyOverrides")) missingSection = true;
                 if (!ini.ContainsKey("CharMap")) missingSection = true;
+                if (!ini.ContainsKey("MainWindow")) missingSection = true;
                 if (!ini.ContainsKey("DebuggerWindow")) missingSection = true;
                 if (!ini.ContainsKey("MemoryViewerWindow")) missingSection = true;
                 if (!ini.ContainsKey("DebuggerBreakpoints")) missingSection = true;
@@ -213,6 +217,17 @@ public sealed class Settings
             sb.AppendLine(";   <glyph>          Free-text comment showing the literal character,");
             sb.AppendLine(";                    purely for hand-editing readability.");
             foreach (var line in CharMapOverrides.SerialiseLines()) sb.AppendLine(line);
+            sb.AppendLine();
+
+            sb.AppendLine("[MainWindow]");
+            sb.AppendLine("; Last on-screen position of the main emulator window.");
+            sb.AppendLine("; Only X / Y are honoured on next launch — the window's Width /");
+            sb.AppendLine("; Height are driven by the Display scale (1×/2×/3×), so the");
+            sb.AppendLine("; persisted size figures here are informational only.");
+            sb.AppendLine($"X={MainWindow.X}");
+            sb.AppendLine($"Y={MainWindow.Y}");
+            sb.AppendLine($"Width={MainWindow.Width}");
+            sb.AppendLine($"Height={MainWindow.Height}");
             sb.AppendLine();
 
             sb.AppendLine("[DebuggerWindow]");

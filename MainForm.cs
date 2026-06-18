@@ -61,7 +61,17 @@ public sealed class MainForm : Form
         KeyPreview = true;
         AllowDrop = true;
         DoubleBuffered = true;
-        StartPosition = FormStartPosition.CenterScreen;
+        // Saved geometry wins, else center on the screen. Size is set by
+        // ApplyDisplayScale further down — only X / Y are restored here.
+        if (_settings.MainWindow.HasGeometry)
+        {
+            StartPosition = FormStartPosition.Manual;
+            Location = new Point(_settings.MainWindow.X, _settings.MainWindow.Y);
+        }
+        else
+        {
+            StartPosition = FormStartPosition.CenterScreen;
+        }
         FormBorderStyle = FormBorderStyle.Sizable;
 
         BuildMenu();
@@ -128,7 +138,21 @@ public sealed class MainForm : Form
             Focus();
             Start();
         };
-        FormClosing += (_, _) => { _timer.Stop(); _debugger?.Dispose(); _memViewer?.Dispose(); _hidDiag?.Dispose(); _machine.Sound.Dispose(); };
+        FormClosing += (_, _) =>
+        {
+            // Snapshot main-window geometry to Settings before the child
+            // windows tear down so the next launch comes up where the
+            // user left it.
+            _settings.MainWindow = new Settings.WindowState(
+                Location.X, Location.Y, ClientSize.Width, ClientSize.Height);
+            _settings.Save();
+
+            _timer.Stop();
+            _debugger?.Dispose();
+            _memViewer?.Dispose();
+            _hidDiag?.Dispose();
+            _machine.Sound.Dispose();
+        };
     }
 
     private void BuildMenu()
