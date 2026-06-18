@@ -146,8 +146,13 @@ public sealed class MZ700
         int cyclesThisFrame = 0;
         int cyclesToVBlank = (int)(CyclesPerFrame * 0.85);
 
-        // Type-ahead (auto-typed commands) tick
+        // Type-ahead (auto-typed commands) tick.
         Keyboard.TickAutoType();
+        // Live-typing staged key bits: presses whose MzShift requirement
+        // forced a $1170 transition land their key bit a couple of frames
+        // after shift was set, so the ROM scan sees a consistent
+        // (shift, key) pair rather than the key with stale cached shift.
+        Keyboard.TickStagedKeyBits();
 
         Cpu.BreakpointTripped = false;
         bool tripped = false;

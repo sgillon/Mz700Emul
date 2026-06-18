@@ -65,6 +65,18 @@ public sealed class Keyboard
     // back to this VK so KeyUp knows which matrix bits to release.
     private Keys _pendingDownVk = Keys.None;
 
+    // Live presses whose key bit is deliberately held back so the OS has
+    // a settled chance to observe the new $1170 / matrix(8,0) before the
+    // key bit lands. Each entry carries a small frame countdown — the
+    // auto-typer's AwaitShiftScan phase has the same purpose on its
+    // side. Two frames empirically clears the unshifted-`'` race on
+    // typical hardware; smaller values still leak presses where the
+    // ROM's GETKY happened to enter its scan loop just before $1170
+    // updated.
+    private const int LiveShiftStageFrames = 2;
+    private readonly List<StagedPress> _stagedKeyBits = new();
+    private record struct StagedPress(Keys Vk, int Row, int Col, int FramesLeft);
+
     public Keyboard()
     {
         for (int i = 0; i < 10; i++) _rows[i] = 0xFF;
@@ -104,6 +116,7 @@ public sealed class Keyboard
         for (int i = 0; i < 10; i++) _rows[i] = 0xFF;
         _holds.Clear();
         _pendingDownVk = Keys.None;
+        _stagedKeyBits.Clear();
     }
 
     /// <summary>
@@ -270,8 +283,50 @@ public sealed class Keyboard
         // don't clobber our override.
         _holds[vk] = new ActiveHold(p.Row, p.Col, ExplicitMzShift: p.MzShift);
         ApplyShiftState();
-        SetMatrix(p.Row, p.Col, true);
+
+        if (p.MzShift)
+        {
+            // Any press that requires MZ shift goes through the staged
+            // path: hold the key bit back for a couple of frames so any
+            // in-flight GETKY routine that cached $1170 at routine
+            // entry has time to complete and a fresh one to start with
+            // our updated value. The canonical race this closes is
+            // unshifted PC ' (UK layout) translating to MZ 7 when
+            // GETKY's cached shift = 0 catches a key bit asserted in
+            // the same tick.
+            _stagedKeyBits.Add(new StagedPress(vk, p.Row, p.Col, LiveShiftStageFrames));
+        }
+        else
+        {
+            SetMatrix(p.Row, p.Col, true);
+        }
         Diag.Record(InputLayer.Character, p.Row, p.Col, p.MzShift);
+    }
+
+    /// <summary>
+    /// Per-frame tick (called from <see cref="MZ700.RunFrame"/> before
+    /// CPU cycles). Decrements each staged press's countdown; when it
+    /// hits zero the key bit lands. Skips presses whose hold has
+    /// already been released — a press that arrives and releases inside
+    /// the stage window simply doesn't register, which is preferable
+    /// to mis-translating it.
+    /// </summary>
+    public void TickStagedKeyBits()
+    {
+        if (_stagedKeyBits.Count == 0) return;
+        for (int i = _stagedKeyBits.Count - 1; i >= 0; i--)
+        {
+            var s = _stagedKeyBits[i];
+            int left = s.FramesLeft - 1;
+            if (left > 0)
+            {
+                _stagedKeyBits[i] = s with { FramesLeft = left };
+                continue;
+            }
+            if (_holds.ContainsKey(s.Vk))
+                SetMatrix(s.Row, s.Col, true);
+            _stagedKeyBits.RemoveAt(i);
+        }
     }
 
     /// <summary>
@@ -301,6 +356,10 @@ public sealed class Keyboard
             _holds.Remove(bareVk);
             handled = true;
         }
+        // If this VK had a staged key bit still waiting, drop it — the
+        // press was never asserted, so there's nothing for the OS to
+        // have seen.
+        _stagedKeyBits.RemoveAll(p => p.Vk == bareVk);
 
         // Shift-key release lands here without a matching hold (shift
         // alone doesn't go in _holds). Recompute unconditionally so
