@@ -24,6 +24,19 @@ namespace MZ700Emul;
 /// </summary>
 public sealed class SettingsForm : Form
 {
+    /// <summary>
+    /// Which tab to land on when the dialog opens. Values are aligned
+    /// with the order tabs are added in the constructor so the host
+    /// can pass them straight to <see cref="TabControl.SelectedIndex"/>.
+    /// </summary>
+    public enum Tab
+    {
+        Roms = 0,
+        Display = 1,
+        Keyboard = 2,
+        Joystick = 3,
+    }
+
     private readonly Settings _settings;
     private readonly JoystickInput? _joystickInput;
     private readonly MZ700? _machine;
@@ -60,7 +73,8 @@ public sealed class SettingsForm : Form
     /// button bindings).</summary>
     public event Action? Applied;
 
-    public SettingsForm(Settings settings, JoystickInput? joystickInput = null, MZ700? machine = null)
+    public SettingsForm(Settings settings, JoystickInput? joystickInput = null, MZ700? machine = null,
+        Tab initialTab = Tab.Roms)
     {
         _settings = settings;
         _joystickInput = joystickInput;
@@ -84,6 +98,10 @@ public sealed class SettingsForm : Form
         tabs.TabPages.Add(BuildDisplayTab());
         tabs.TabPages.Add(BuildKeyboardTab());
         tabs.TabPages.Add(BuildJoystickTab());
+        // Caller can deep-link to a specific tab via the Tab enum; clamp
+        // defensively if a new tab is added but the enum value lags.
+        int idx = (int)initialTab;
+        if (idx >= 0 && idx < tabs.TabPages.Count) tabs.SelectedIndex = idx;
 
         var buttonRow = BuildButtonRow();
 

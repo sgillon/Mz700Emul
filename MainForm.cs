@@ -141,7 +141,25 @@ public sealed class MainForm : Form
         file.DropDownItems.Add(new ToolStripSeparator());
         file.DropDownItems.Add(new ToolStripMenuItem("&Reset", null, (_, _) => ResetMachine()) { ShortcutKeys = Keys.Control | Keys.R });
         file.DropDownItems.Add(new ToolStripSeparator());
-        file.DropDownItems.Add(new ToolStripMenuItem("&Settings…", null, (_, _) => OpenSettings()) { ShortcutKeys = Keys.Control | Keys.S });
+        // Settings: parent expands a submenu of the four tabs. Ctrl+S
+        // stays on the ROMs entry so the existing muscle memory still
+        // lands the user on the dialog's default tab; the other three
+        // tabs each get a Ctrl+Shift+letter shortcut so they can be
+        // reached without a menu walk once the dialog is busier.
+        var settings = new ToolStripMenuItem("&Settings");
+        settings.DropDownItems.Add(new ToolStripMenuItem("&ROMs…", null,
+            (_, _) => OpenSettings(SettingsForm.Tab.Roms))
+            { ShortcutKeys = Keys.Control | Keys.S });
+        settings.DropDownItems.Add(new ToolStripMenuItem("&Display…", null,
+            (_, _) => OpenSettings(SettingsForm.Tab.Display))
+            { ShortcutKeys = Keys.Control | Keys.Shift | Keys.D });
+        settings.DropDownItems.Add(new ToolStripMenuItem("&Keyboard…", null,
+            (_, _) => OpenSettings(SettingsForm.Tab.Keyboard))
+            { ShortcutKeys = Keys.Control | Keys.Shift | Keys.K });
+        settings.DropDownItems.Add(new ToolStripMenuItem("&Joystick…", null,
+            (_, _) => OpenSettings(SettingsForm.Tab.Joystick))
+            { ShortcutKeys = Keys.Control | Keys.Shift | Keys.J });
+        file.DropDownItems.Add(settings);
         file.DropDownItems.Add(new ToolStripSeparator());
         file.DropDownItems.Add(new ToolStripMenuItem("E&xit", null, (_, _) => Close()));
         menu.Items.Add(file);
@@ -807,9 +825,9 @@ public sealed class MainForm : Form
         _statusLabel.Text = "Reset.";
     }
 
-    private void OpenSettings()
+    private void OpenSettings(SettingsForm.Tab tab = SettingsForm.Tab.Roms)
     {
-        using var dlg = new SettingsForm(_settings, _joystickInput, _machine);
+        using var dlg = new SettingsForm(_settings, _joystickInput, _machine, tab);
         dlg.Applied += OnSettingsApplied;
         dlg.ShowDialog(this);
     }

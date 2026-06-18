@@ -125,7 +125,10 @@ ROMs / BASIC alongside the exe per [Quickstart](#quickstart).
 | Load BASIC | Ctrl+B |
 | Load BASIC source… | Ctrl+Shift+B |
 | Reset | Ctrl+R |
-| Settings… | Ctrl+S |
+| Settings → ROMs… | Ctrl+S |
+| Settings → Display… | Ctrl+Shift+D |
+| Settings → Keyboard… | Ctrl+Shift+K |
+| Settings → Joystick… | Ctrl+Shift+J |
 | Display 1× / 2× / 3× | Ctrl+1 / Ctrl+2 / Ctrl+3 |
 | Debugger… | Ctrl+D |
 | Memory Viewer… | Ctrl+M |
@@ -238,10 +241,6 @@ games/           Joystick test program (joytest.bas / .mzf).
 
 Items I'd like to come back to (rough priority order):
 
-- **Direct-jump shortcuts to settings tabs** — once the settings UI
-  gets busier, add menu entries that open the dialog already focused
-  on a specific tab (e.g. *Settings → Joystick…*) so users don't have
-  to navigate inside.
 - **BASIC-aware debugger panes** — program lister with de-tokenised
   output, current-line indicator, variable-table reader.
 - **Current-line highlighting** in the source view once the BASIC
