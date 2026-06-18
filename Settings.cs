@@ -20,6 +20,12 @@ public sealed class Settings
 {
     public int DisplayScale { get; set; } = 2;
 
+    // CRT-style scanline overlay on the rendered framebuffer. Off by
+    // default; cheap render-time effect that draws a dim horizontal
+    // line every native scanline-row. Toggleable from Settings →
+    // Display, persisted as [Display] Scanlines=true/false.
+    public bool DisplayScanlines { get; set; } = false;
+
     // Paths to the system files (monitor ROM, character font, BASIC
     // cassette image). Populated automatically on first run by scanning
     // the program directory; the user can edit settings.ini afterwards
@@ -85,6 +91,7 @@ public sealed class Settings
             {
                 var ini = ParseIni(File.ReadAllLines(FilePath));
                 s.DisplayScale = GetInt(ini, "Display", "Scale", s.DisplayScale);
+                s.DisplayScanlines = GetBool(ini, "Display", "Scanlines", s.DisplayScanlines);
                 s.MonitorRomPath = GetString(ini, "Roms", "Monitor", "");
                 s.FontPath = GetString(ini, "Roms", "Font", "");
                 s.BasicPath = GetString(ini, "Roms", "Basic", "");
@@ -149,7 +156,10 @@ public sealed class Settings
             sb.AppendLine(";   Scale=1   native 320×200");
             sb.AppendLine(";   Scale=2   640×400 (default)");
             sb.AppendLine(";   Scale=3   960×600");
+            sb.AppendLine(";   Scanlines  CRT-style dim line on every native scanline:");
+            sb.AppendLine(";                true / false (default false)");
             sb.AppendLine($"Scale={DisplayScale}");
+            sb.AppendLine($"Scanlines={(DisplayScanlines ? "true" : "false")}");
             sb.AppendLine();
 
             sb.AppendLine("[Roms]");
@@ -413,6 +423,17 @@ public sealed class Settings
         if (ini.TryGetValue(section, out var s) && s.TryGetValue(key, out var v) &&
             int.TryParse(v, NumberStyles.Integer, CultureInfo.InvariantCulture, out var n))
             return n;
+        return fallback;
+    }
+
+    private static bool GetBool(Dictionary<string, Dictionary<string, string>> ini, string section, string key, bool fallback)
+    {
+        if (ini.TryGetValue(section, out var s) && s.TryGetValue(key, out var v))
+        {
+            var t = v.Trim();
+            if (t.Equals("true", StringComparison.OrdinalIgnoreCase) || t == "1") return true;
+            if (t.Equals("false", StringComparison.OrdinalIgnoreCase) || t == "0") return false;
+        }
         return fallback;
     }
 

@@ -38,6 +38,25 @@ public sealed class MainForm : Form
     private MemoryViewerForm? _memViewer;
     private HidDiagnosticForm? _hidDiag;
     private FontSheetForm? _fontSheet;
+
+    // Full-screen state. _isFullScreen tracks the toggle; the other
+    // fields capture the windowed-mode chrome so ExitFullScreen can
+    // restore exactly what was there. Alt+Enter toggles via
+    // ProcessCmdKey, the View → Full-screen menu item is the
+    // discovery affordance.
+    private bool _isFullScreen;
+    private FormBorderStyle _preFullScreenBorderStyle;
+    private FormWindowState _preFullScreenWindowState;
+    private Rectangle _preFullScreenBounds;
+    private ToolStripMenuItem? _fullScreenMenuItem;
+    private ToolStripMenuItem? _scanlinesMenuItem;
+    private readonly bool _startFullScreen;
+    // Captures the pre-override scanlines value when --scanlines was
+    // passed on the CLI. The natural-close FormClosing handler restores
+    // it before Save so a per-session override doesn't sneak into
+    // settings.ini. Cleared the moment the user explicitly toggles
+    // (View → Scanlines, Ctrl+L) — that's now their persisted choice.
+    private bool? _scanlinesRestoreOnClose;
     // Tracks the previous GRAPH-mode bit so we can detect ALPHA→GRAPH
     // transitions and auto-surface the Font Sheet — the only way to
     // reach MZ-only graphic glyphs (no PC-key equivalent exists). Opens
@@ -46,11 +65,21 @@ public sealed class MainForm : Form
     private bool _wasGraphMode;
     private KeyboardMatrixForm? _matrixForm;
 
-    public MainForm(string? cassettePath, bool autoLoadBasic, string? dumpPath = null)
+    public MainForm(string? cassettePath, bool autoLoadBasic, string? dumpPath = null,
+        int? displayScaleOverride = null, bool startFullScreen = false,
+        bool? scanlinesOverride = null)
     {
         _initialCassette = cassettePath;
         _autoLoadBasic = autoLoadBasic;
         _dumpPath = dumpPath;
+        _startFullScreen = startFullScreen;
+        // CLI --scanlines on/off wins for this session. Snapshot the
+        // persisted value so the natural-close path can restore it.
+        if (scanlinesOverride.HasValue)
+        {
+            _scanlinesRestoreOnClose = _settings.DisplayScanlines;
+            _settings.DisplayScanlines = scanlinesOverride.Value;
+        }
         _joystickInput = new Hardware.JoystickInput(_machine.Joystick);
         _joystickInput.SetButtonIndices(_settings.JoyButton1Index, _settings.JoyButton2Index);
         _machine.Keyboard.Overrides = _settings.KeyOverrides;
@@ -115,7 +144,10 @@ public sealed class MainForm : Form
 
         // Size last, after menu + status strip are docked so their heights
         // are known. Sets ClientSize so the video area is exactly N× native.
-        ApplyDisplayScale(_settings.DisplayScale);
+        // --display=N from the CLI wins over the persisted scale but isn't
+        // saved back to settings.ini (per-session override).
+        int initialScale = displayScaleOverride ?? _settings.DisplayScale;
+        ApplyDisplayScale(initialScale, persist: !displayScaleOverride.HasValue);
 
         _timer.Interval = 1000 / MZ700.FramesPerSecond;
         _timer.Tick += Timer_Tick;
@@ -137,6 +169,12 @@ public sealed class MainForm : Form
             Activate();
             Focus();
             Start();
+
+            // --display=full from the CLI flips into borderless mode
+            // after the windowed form has settled (Shown fires after
+            // the first paint), so the saved windowed bounds are still
+            // valid for restoring later via Alt+Enter.
+            if (_startFullScreen) EnterFullScreen();
         };
         FormClosing += (_, _) =>
         {
@@ -145,6 +183,10 @@ public sealed class MainForm : Form
             // user left it.
             _settings.MainWindow = new Settings.WindowState(
                 Location.X, Location.Y, ClientSize.Width, ClientSize.Height);
+            // Restore the pre-override scanlines value if --scanlines was
+            // used on the CLI and the user never explicitly toggled.
+            if (_scanlinesRestoreOnClose.HasValue)
+                _settings.DisplayScanlines = _scanlinesRestoreOnClose.Value;
             _settings.Save();
 
             _timer.Stop();
@@ -201,6 +243,21 @@ public sealed class MainForm : Form
             view.DropDownItems.Add(item);
         }
         view.DropDownItems.Add(new ToolStripSeparator());
+        // Full-screen toggle. Alt+Enter is captured in ProcessCmdKey
+        // so Windows doesn't intercept it for the system menu; the
+        // menu entry shows the shortcut text as a discovery hint.
+        _fullScreenMenuItem = new ToolStripMenuItem("&Full-screen", null, (_, _) => ToggleFullScreen())
+        {
+            ShortcutKeyDisplayString = "Alt+Enter",
+        };
+        view.DropDownItems.Add(_fullScreenMenuItem);
+        _scanlinesMenuItem = new ToolStripMenuItem("Scan&lines", null, (_, _) => ToggleScanlines())
+        {
+            ShortcutKeys = Keys.Control | Keys.L,
+            Checked = _settings.DisplayScanlines,
+        };
+        view.DropDownItems.Add(_scanlinesMenuItem);
+        view.DropDownItems.Add(new ToolStripSeparator());
         // Font Sheet — always available from View for click-to-type
         // glyph access. Also auto-surfaces in the Timer_Tick handler
         // on ALPHA→GRAPH transitions, since graphic glyphs have no
@@ -231,7 +288,85 @@ public sealed class MainForm : Form
         Controls.Add(menu);
     }
 
-    private void ApplyDisplayScale(int scale)
+    // -- Full-screen ----------------------------------------------------
+
+    private void ToggleFullScreen()
+    {
+        if (_isFullScreen) ExitFullScreen();
+        else EnterFullScreen();
+    }
+
+    private void EnterFullScreen()
+    {
+        if (_isFullScreen) return;
+        _preFullScreenBorderStyle = FormBorderStyle;
+        _preFullScreenWindowState = WindowState;
+        _preFullScreenBounds = Bounds;
+
+        if (MainMenuStrip != null) MainMenuStrip.Visible = false;
+        _status.Visible = false;
+        FormBorderStyle = FormBorderStyle.None;
+        // Restore to Normal first; Maximized + None gives a maximized
+        // borderless window that fills the working area only — we want
+        // the whole screen including the taskbar area for true full-
+        // screen, so set Bounds explicitly.
+        WindowState = FormWindowState.Normal;
+        Bounds = Screen.FromControl(this).Bounds;
+
+        _isFullScreen = true;
+        if (_fullScreenMenuItem != null) _fullScreenMenuItem.Checked = true;
+    }
+
+    private void ExitFullScreen()
+    {
+        if (!_isFullScreen) return;
+        FormBorderStyle = _preFullScreenBorderStyle;
+        WindowState = _preFullScreenWindowState;
+        if (_preFullScreenWindowState == FormWindowState.Normal)
+            Bounds = _preFullScreenBounds;
+        if (MainMenuStrip != null) MainMenuStrip.Visible = true;
+        _status.Visible = true;
+
+        _isFullScreen = false;
+        if (_fullScreenMenuItem != null) _fullScreenMenuItem.Checked = false;
+    }
+
+    private void ToggleScanlines()
+    {
+        _settings.DisplayScanlines = !_settings.DisplayScanlines;
+        // User has now explicitly chosen — any CLI override no longer
+        // needs to be restored on close.
+        _scanlinesRestoreOnClose = null;
+        _settings.Save();
+        if (_scanlinesMenuItem != null) _scanlinesMenuItem.Checked = _settings.DisplayScanlines;
+        _display.Invalidate();
+    }
+
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+    {
+        // Alt+Enter is the full-screen toggle. Catching it here keeps it
+        // out of Windows' own Alt-handling (which would otherwise pop
+        // the system menu or eat the keystroke).
+        if (keyData == (Keys.Alt | Keys.Enter))
+        {
+            ToggleFullScreen();
+            return true;
+        }
+        // Alt+F4 must close the emulator. F4 alone is wired to MZ F4 via
+        // SpecialKeyMap so the normal OnKeyDown path marks it as handled
+        // — that would swallow Alt+F4 too and the user gets no way out
+        // of full-screen short of Task Manager. Catch it here, ahead of
+        // the matrix path, so Close() fires (which honours FormClosing
+        // and saves window state).
+        if (keyData == (Keys.Alt | Keys.F4))
+        {
+            Close();
+            return true;
+        }
+        return base.ProcessCmdKey(ref msg, keyData);
+    }
+
+    private void ApplyDisplayScale(int scale, bool persist = true)
     {
         if (scale < 1) scale = 1;
         if (scale > 3) scale = 3;
@@ -244,7 +379,9 @@ public sealed class MainForm : Form
             if (_scaleMenuItems[i] != null)
                 _scaleMenuItems[i].Checked = (i + 1 == scale);
         }
-        if (_settings.DisplayScale != scale)
+        // CLI --display=N overrides for this session without rewriting
+        // settings.ini, so the persisted preference survives.
+        if (persist && _settings.DisplayScale != scale)
         {
             _settings.DisplayScale = scale;
             _settings.Save();
@@ -639,6 +776,21 @@ public sealed class MainForm : Form
         int x = (cr.Width - w) / 2;
         int y = (cr.Height - h) / 2;
         e.Graphics.DrawImage(frame, new Rectangle(x, y, w, h));
+
+        // Optional CRT-style scanline overlay: a dim line every
+        // native-scanline-row, so each MZ pixel-row gets one dark
+        // separator beneath it. Skipped at sub-2× rendered scale where
+        // the gap is too thin to read as scanlines.
+        if (_settings.DisplayScanlines)
+        {
+            int step = (int)Math.Round(scale);
+            if (step >= 2)
+            {
+                using var dim = new SolidBrush(Color.FromArgb(110, 0, 0, 0));
+                for (int row = step - 1; row < h; row += step)
+                    e.Graphics.FillRectangle(dim, x, y + row, w, 1);
+            }
+        }
     }
 
     private static bool IsShiftKey(Keys k) =>
@@ -865,6 +1017,14 @@ public sealed class MainForm : Form
         // View menu's checked state. ApplyDisplayScale is a no-op if the
         // value didn't actually change.
         ApplyDisplayScale(_settings.DisplayScale);
+        // Mirror the scanlines checkbox state onto the View → Scanlines
+        // menu item so the two stay in sync regardless of which path
+        // the user toggled from. Also count Settings Apply as an
+        // explicit acceptance of current state — a CLI override no
+        // longer needs reverting on close.
+        if (_scanlinesMenuItem != null) _scanlinesMenuItem.Checked = _settings.DisplayScanlines;
+        _scanlinesRestoreOnClose = null;
+        _display.Invalidate();
         // Joystick button bindings can be re-pushed live; ROM paths take
         // effect on the next Reset, so we don't touch the running machine.
         _joystickInput.SetButtonIndices(_settings.JoyButton1Index, _settings.JoyButton2Index);

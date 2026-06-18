@@ -49,6 +49,7 @@ public sealed class SettingsForm : Form
     private readonly RadioButton _rb1x = new() { Text = "&1× (320×200)", AutoSize = true };
     private readonly RadioButton _rb2x = new() { Text = "&2× (640×400)", AutoSize = true };
     private readonly RadioButton _rb3x = new() { Text = "&3× (960×600)", AutoSize = true };
+    private readonly CheckBox _chkScanlines = new() { Text = "CRT-style scan&lines", AutoSize = true };
 
     // ROMs
     private readonly TextBox _txtMonitor = new() { Width = 280 };
@@ -145,6 +146,13 @@ public sealed class SettingsForm : Form
         stack.Controls.Add(_rb1x);
         stack.Controls.Add(_rb2x);
         stack.Controls.Add(_rb3x);
+        stack.Controls.Add(new Label
+        {
+            Text = "Effects:",
+            AutoSize = true,
+            Margin = new Padding(0, 14, 0, 6),
+        });
+        stack.Controls.Add(_chkScanlines);
         return BuildTabPage("Display", stack);
     }
 
@@ -696,6 +704,7 @@ public sealed class SettingsForm : Form
             case 3: _rb3x.Checked = true; break;
             default: _rb2x.Checked = true; break;
         }
+        _chkScanlines.Checked = _settings.DisplayScanlines;
         _txtMonitor.Text = _settings.MonitorRomPath;
         _txtFont.Text = _settings.FontPath;
         _txtBasic.Text = _settings.BasicPath;
@@ -707,6 +716,7 @@ public sealed class SettingsForm : Form
     private void ApplyChanges()
     {
         _settings.DisplayScale = _rb3x.Checked ? 3 : _rb1x.Checked ? 1 : 2;
+        _settings.DisplayScanlines = _chkScanlines.Checked;
         _settings.MonitorRomPath = _txtMonitor.Text.Trim();
         _settings.FontPath = _txtFont.Text.Trim();
         _settings.BasicPath = _txtBasic.Text.Trim();
@@ -732,6 +742,7 @@ public sealed class SettingsForm : Form
     {
         var candidate = SettingsSnapshot.Build(
             displayScale: _rb3x.Checked ? 3 : _rb1x.Checked ? 1 : 2,
+            displayScanlines: _chkScanlines.Checked,
             monitorPath: _txtMonitor.Text.Trim(),
             fontPath: _txtFont.Text.Trim(),
             basicPath: _txtBasic.Text.Trim(),

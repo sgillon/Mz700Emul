@@ -113,6 +113,8 @@ ROMs / BASIC alongside the exe per [Quickstart](#quickstart).
 |---|---|
 | `--basic` (`-b`) | Auto-load S-BASIC after the monitor is ready. Implied automatically when the cassette is a BASIC program. |
 | `<path>.mzf` | Auto-load a cassette image. The MZF type byte is inspected: BASIC programs (type 0x02 / 0x05) auto-load BASIC, then direct-inject + `RUN`; machine-code images (type 0x01) skip BASIC and jump straight to their entry. A `.zip` containing an `.mzf`/`.m12`/`.mzt` entry is also accepted (first cassette entry is used). |
+| `--display=N` | Override the window scale for this run: `1`, `2`, `3`, or `full`/`fs` for borderless full-screen. settings.ini is not modified — Alt+Enter or the View menu still toggle out of full-screen. |
+| `--scanlines[=on\|off]` | Force the CRT-style scanlines overlay on or off for this run. Without the flag the persisted Settings → Display value wins. Doesn't write back to settings.ini unless you also touch the View → Scanlines toggle or open Settings. |
 | `--dump=<file>` | At frame 120 (configurable), dump CPU/PIT/PPI/VRAM state to a text file and exit — useful for offline diagnostics. |
 | `--dumpframe=N` | Override the dump frame number. |
 | `--help` (`-h`) | Show usage. |
@@ -130,6 +132,8 @@ ROMs / BASIC alongside the exe per [Quickstart](#quickstart).
 | Settings → Keyboard… | Ctrl+Shift+K |
 | Settings → Joystick… | Ctrl+Shift+J |
 | Display 1× / 2× / 3× | Ctrl+1 / Ctrl+2 / Ctrl+3 |
+| Full-screen toggle | Alt+Enter |
+| Scanlines toggle | Ctrl+L |
 | Debugger… | Ctrl+D |
 | Memory Viewer… | Ctrl+M |
 | HID Diagnostic… | Ctrl+H |
@@ -236,6 +240,10 @@ games/           Joystick test program (joytest.bas / .mzf).
 - Auto-typed input (BASIC source paste / command auto-load) runs at
   around 6–8 chars/sec — fine for short snippets, slow for long
   listings.
+- CRT-style scanlines (Settings → Display) look right in windowed
+  mode but degrade at full-screen scale where the dim lines spread
+  unevenly across the larger pixel grid. A proper filter (with
+  intensity / line-size controls) is queued for a later pass.
 
 ## Planned future work
 

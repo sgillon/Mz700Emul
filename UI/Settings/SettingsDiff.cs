@@ -20,6 +20,7 @@ namespace MZ700Emul;
 internal sealed class SettingsSnapshot
 {
     public int DisplayScale { get; init; }
+    public bool DisplayScanlines { get; init; }
     public string MonitorRomPath { get; init; } = "";
     public string FontPath { get; init; } = "";
     public string BasicPath { get; init; } = "";
@@ -41,6 +42,7 @@ internal sealed class SettingsSnapshot
     public static SettingsSnapshot Capture(Settings settings) => new()
     {
         DisplayScale = settings.DisplayScale,
+        DisplayScanlines = settings.DisplayScanlines,
         MonitorRomPath = settings.MonitorRomPath ?? "",
         FontPath = settings.FontPath ?? "",
         BasicPath = settings.BasicPath ?? "",
@@ -60,12 +62,14 @@ internal sealed class SettingsSnapshot
     /// </summary>
     public static SettingsSnapshot Build(
         int displayScale,
+        bool displayScanlines,
         string monitorPath, string fontPath, string basicPath,
         int joy1, int joy2,
         CharMapOverrides charOverrides,
         KeyOverride keyOverrides) => new()
         {
             DisplayScale = displayScale,
+            DisplayScanlines = displayScanlines,
             MonitorRomPath = monitorPath ?? "",
             FontPath = fontPath ?? "",
             BasicPath = basicPath ?? "",
@@ -95,6 +99,8 @@ internal static class SettingsDiff
 
         if (before.DisplayScale != after.DisplayScale)
             lines.Add($"Display scale: {before.DisplayScale}× → {after.DisplayScale}×");
+        if (before.DisplayScanlines != after.DisplayScanlines)
+            lines.Add($"Scanlines: {(before.DisplayScanlines ? "on" : "off")} → {(after.DisplayScanlines ? "on" : "off")}");
         if (before.MonitorRomPath != after.MonitorRomPath)
             lines.Add($"Monitor ROM: \"{before.MonitorRomPath}\" → \"{after.MonitorRomPath}\"");
         if (before.FontPath != after.FontPath)

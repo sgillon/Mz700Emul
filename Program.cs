@@ -13,6 +13,9 @@ internal static class Program
         bool autoLoadBasic = false;
         string? dumpPath = null;
         int dumpFrame = 120;
+        int? displayScaleOverride = null;
+        bool startFullScreen = false;
+        bool? scanlinesOverride = null;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -29,17 +32,72 @@ internal static class Program
             {
                 dumpFrame = int.Parse(a.Substring(12));
             }
+            else if (a.Equals("--scanlines", StringComparison.OrdinalIgnoreCase))
+            {
+                scanlinesOverride = true;
+            }
+            else if (a.StartsWith("--scanlines=", StringComparison.OrdinalIgnoreCase))
+            {
+                var v = a.Substring(12).Trim();
+                if (v.Equals("on", StringComparison.OrdinalIgnoreCase)
+                    || v.Equals("true", StringComparison.OrdinalIgnoreCase)
+                    || v == "1")
+                {
+                    scanlinesOverride = true;
+                }
+                else if (v.Equals("off", StringComparison.OrdinalIgnoreCase)
+                    || v.Equals("false", StringComparison.OrdinalIgnoreCase)
+                    || v == "0")
+                {
+                    scanlinesOverride = false;
+                }
+                else
+                {
+                    MessageBox.Show(
+                        $"--scanlines value '{v}' isn't recognised. Expected on or off.",
+                        "MZ-700 Emulator", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+            }
+            else if (a.StartsWith("--display=", StringComparison.OrdinalIgnoreCase))
+            {
+                var v = a.Substring(10).Trim();
+                if (v.Equals("full", StringComparison.OrdinalIgnoreCase)
+                    || v.Equals("fullscreen", StringComparison.OrdinalIgnoreCase)
+                    || v.Equals("fs", StringComparison.OrdinalIgnoreCase))
+                {
+                    startFullScreen = true;
+                }
+                else if (int.TryParse(v, out var n) && n >= 1 && n <= 3)
+                {
+                    displayScaleOverride = n;
+                }
+                else
+                {
+                    MessageBox.Show(
+                        $"--display value '{v}' isn't recognised. Expected 1, 2, 3, or full.",
+                        "MZ-700 Emulator", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+            }
             else if (a.Equals("--help", StringComparison.OrdinalIgnoreCase) || a == "-h" || a == "/?")
             {
                 MessageBox.Show(
                     "MZ-700 Emulator\n\n" +
-                    "Usage: MZ700Emul.exe [--basic] [path\\to\\cassette.mzf|.zip]\n\n" +
-                    "  --basic        Force BASIC to be loaded at startup. Usually not\n" +
-                    "                 needed: BASIC cassettes auto-load BASIC anyway.\n" +
-                    "  <cassette>     Automatically load a cassette image at startup.\n" +
-                    "                 Accepts .mzf/.m12/.mzt or a .zip containing one.\n" +
-                    "                 BASIC programs trigger BASIC auto-load; machine-\n" +
-                    "                 code images run directly under the monitor.\n\n" +
+                    "Usage: MZ700Emul.exe [--basic] [--display=N] [path\\to\\cassette.mzf|.zip]\n\n" +
+                    "  --basic         Force BASIC to be loaded at startup. Usually not\n" +
+                    "                  needed: BASIC cassettes auto-load BASIC anyway.\n" +
+                    "  --display=N     Override the persisted window scale for this run:\n" +
+                    "                  1, 2, or 3 picks the matching size; 'full' (or\n" +
+                    "                  'fs') opens full-screen. settings.ini is not\n" +
+                    "                  modified — Alt+Enter or the View menu still toggle.\n" +
+                    "  --scanlines     Force the CRT-style scanlines overlay on for this\n" +
+                    "                  run. --scanlines=off forces it off. Without the\n" +
+                    "                  flag the persisted Settings → Display value wins.\n" +
+                    "  <cassette>      Automatically load a cassette image at startup.\n" +
+                    "                  Accepts .mzf/.m12/.mzt or a .zip containing one.\n" +
+                    "                  BASIC programs trigger BASIC auto-load; machine-\n" +
+                    "                  code images run directly under the monitor.\n\n" +
                     "At runtime you may also drag-and-drop a .mzf or .zip file onto the\n" +
                     "window or use the File menu to load one.",
                     "MZ-700 Emulator");
@@ -59,7 +117,7 @@ internal static class Program
         MatrixValidation.RunAndLog();
 
         ApplicationConfiguration.Initialize();
-        var form = new MainForm(cassettePath, autoLoadBasic, dumpPath);
+        var form = new MainForm(cassettePath, autoLoadBasic, dumpPath, displayScaleOverride, startFullScreen, scanlinesOverride);
         form._dumpFrame = dumpFrame;
         Application.Run(form);
     }
