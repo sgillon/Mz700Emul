@@ -291,6 +291,208 @@ A5–A12 still pending. Phase B (Override editing via the editor UI) to
 follow. Step-by-step plan and decisions captured in the
 `project_keyboard_editor_plan` memory.
 
+### 2026-06-05 to 2026-06-07 — Keyboard editor: diagnostics and diagram-first UI
+
+- **`KeyCaptureControl` + Debug → Key Capture Test** (`d572f7f`):
+  isolated key-capture widget for the editor flow.
+- **`KeyboardMatrixGrid` + Debug → Keyboard Matrix…** (`25601eb`):
+  live 10×8 matrix grid showing asserted bits per frame. Pairs
+  naturally with the HID Diagnostic.
+- **Settings → Keyboard tab (read-only)** (`d48642b`): matrix view +
+  overrides list. First Settings tab past the original Display / ROMs
+  / Joystick three.
+- **`KeyBindingEditorForm`** (`814ae02`): live edits to the CharMap
+  layer.
+- **Phase 2 — diagram-first MZ key binding UI** (`0ad3375`,
+  2026-06-07): the Settings → Keyboard tab redrawn as a clickable
+  rendering of the actual MZ-700 keyboard, each cap badged with its
+  current PC binding. Click a cap → per-key editor (unshifted /
+  shifted cards) → capture PC key → Save. Safety gate outlines
+  unreachable MZ keys in crimson and prompts before Apply lets them
+  through. Export / Import `.mzkbd`.
+- **GRAPH-mode ROM key tables found; bank-1 click-to-type parked**
+  (`222b22c`): Font Sheet bank-1 cells type a byte but the attribute
+  ends up wrong, so glyphs come out coloured but in the wrong
+  palette. Tables at `$0BEA` / `$0C2A` / `$0C6A` / `$0CAA`. Marked
+  as a known limitation rather than rushed — see
+  `project_graph_clicktotype_parked` memory.
+
+### 2026-06-12 — MZ Ctrl reachability fix, F5, About dialog
+
+- **MZ Ctrl + F5 slot fix** (`42229c8`): two stacked bugs. (1) VK
+  normalisation — `SpecialKeyMap` bound `Keys.LControlKey` /
+  `Keys.RControlKey`, but WinForms collapses both to generic
+  `Keys.ControlKey` so neither entry ever fired. (2) Wrong matrix
+  slot — codebase had MZ CTRL at `(9, 2)`, but pressing `(9, 2)`
+  in S-BASIC produced `CHR$(`, revealing it as a shifted-F5 macro
+  alias. Owner's Manual confirms CTRL is at `(8, 6)`. Same
+  investigation pinned F5 at `(9, 3)` and wired it through PC F5
+  (BASIC's default F5 macro types `CHR$(`).
+- **`AboutForm`** (`7749da4`): icon, version (read from
+  `AssemblyInformationalVersion` — bump `<Version>` in the csproj
+  and the About dialog refreshes), build date, GitHub + launcher-
+  setup links, Sharp + Claude acknowledgements. Replaces the
+  one-liner MessageBox.
+- **Application icon** (added 2026-06-04, `47d6454`): a Sharp `mz`
+  wordmark, single source `MZRaku.ico` used as the Explorer / taskbar
+  / alt-tab / title-bar icon and embedded for AboutForm's runtime
+  pickup.
+
+### 2026-06-13 — Canonical matrix reference
+
+The keyboard matrix `(row, col)` coordinates were independently
+encoded in `SpecialKeyMap`, `CharMap`, `MzKeyboardLayout`, and
+`tools/RomAnalyse`. Drift between them had let the CTRL = (8,6)
+bug above hide for weeks. Fix is structural:
+
+- **`Mz700MatrixReference.cs`** (`683002e`) encodes the matrix as
+  data — every slot's expected glyph(s) and special-key role.
+- **Reconciliation pass** (`d8de85f`) reduced three further drifts
+  to bring CharMap and MzKeyboardLayout into agreement with the
+  reference.
+- **Startup validation** (`03691ef`) — consumer files validate
+  against the reference at boot; a drift surfaces as a "Matrix
+  validation drift" `MessageBox`, not weeks later as a typing bug.
+
+This established the **canonical-reference pattern**: when data is
+encoded across multiple parallel files, build one reference + start-
+up validators rather than chasing drifts individually. Re-applied
+later for the sound subsystem (`Mz700SoundReference`).
+
+### 2026-06-14 — v0.0.8-preview ships, UI/ reorganisation
+
+- **Release-host-held matrix bits on Reset** (`d2f3493`): Ctrl+R
+  previously left MZ CTRL asserted on the matrix (PC Ctrl down had
+  asserted (8,6); Reset didn't clear it) until the host released PC
+  Ctrl. `Keyboard.ReleaseAll` now runs as part of Reset.
+- **Unbound-slot panel** (`f821382`) in the advanced keyboard view:
+  reference cells that nothing currently reaches surface here, so
+  omissions like the original F5 gap can't lurk silently again.
+- **Known-limitations panel** in Settings → Keyboard (`5bc1331`):
+  the three parked items (bank-1 click-to-type, MZ-shift assertion
+  race, no L/R Ctrl distinction) listed at the bottom of the tab.
+- **AboutForm build-date under single-file** (`7e7de16`):
+  `Assembly.Location` returns `""` under `PublishSingleFile`, so the
+  About dialog's "Built …" line read epoch. Fixed by reading the
+  exe's mtime via `AppContext.BaseDirectory`. Caught by the release
+  checklist walk.
+- **`UI/` reorganisation** (`139f7bc` `3019332` `50bbb67` `4ae320c`
+  `3cabd09`): WinForms surfaces grouped into `UI/Keyboard/`,
+  `UI/Debugger/`, `UI/Diagnostics/`, `UI/Settings/`, plus AboutForm
+  and SmoothControls at `UI/` root. Pure file moves; no behaviour
+  change.
+- **v0.0.8-preview tagged and released.**
+
+### 2026-06-18 — Keyboard tightening, debugger persistence
+
+- **Default-suppression layer in CharMapOverrides** (`d683864`) —
+  per-slot deletes overlay alongside the existing per-slot
+  overrides.
+- **Slot-replace + case-pair in the slot editor** (`6808daf`) — when
+  rebinding a slot that's already in use elsewhere, the editor offers
+  to clear the prior binding too, so it never has to be hunted down
+  by hand.
+- **Change summary before save** (`79e5662`) — Settings → Apply now
+  pops a short diff of what's about to change before persisting, so
+  it's clear what's about to be applied.
+- **MZ-only glyph safety-gate exemption** (`0cac555`) — the
+  unreachable-key check exempts slots whose glyphs are MZ-only by
+  design (POUND/↓, the AT-slot shifted reversed-apostrophe). Crimson
+  outlines now only fire on actually-broken bindings.
+- **Deep-link the four Settings tabs from File menu** (`c702bb7`) —
+  File → Settings → ROMs/Display/Keyboard/Joystick with hotkeys
+  Ctrl+S / Ctrl+Shift+D / Ctrl+Shift+K / Ctrl+Shift+J.
+- **MZ-shift assertion race fix** (`26b765b`, `a762e36`) — moved
+  shift-state ownership into `Keyboard`, and live key bits are
+  staged a couple of frames after the MzShift state changes via
+  `$1170`, so the ROM scan sees a consistent (shift, key) pair
+  rather than the key with stale cached shift. Pre-existing race
+  in all releases since v0.0.5.
+- **Persisted debugger / memory-viewer geometry + breakpoints**
+  (`72c883d`) + **persisted main window location** (`1e926c2`) —
+  Settings.ini gained `[Window]`, `[Debugger]`, `[MemoryViewer]`,
+  `[Breakpoints]` sections.
+- **Full-screen + CRT scanlines** (`ddd0b2a`) — View → Full-screen
+  (Alt+Enter), View → Scanlines (Ctrl+L). CLI overrides:
+  `--display=full|fs`, `--scanlines=on|off`. Scale + Scanlines
+  persist in `[Display]`. F11 stayed as the GRAPH binding — Alt+Enter
+  for full-screen sidesteps the conflict.
+
+### 2026-06-19 — Sound: speaker-NAND hard gate at $E008 D0
+
+The original v0.0.5-era complaint "boot tone doesn't play" turned
+out to be a symptom of a broader pipeline gap, not the actual bug.
+
+- **Schematic re-read** of `_technicaldocs/PIT circuit.png` confirmed
+  IC7E LS74 has *two* flip-flops doing *two* jobs:
+  - **FF1 — hard gate.** D = bus D0, CK = IC6F LS02 NOR(MW, CSE2)
+    (rising edge on every write to a CSE2 address — `$E008` is one),
+    CL = system RESET, Q drives the second input of the speaker-amp
+    NAND. So writing `D0=1` to `$E008` opens audible sound; `D0=0`
+    silences it regardless of C0's state. ROM does *both* during
+    the boot beep — open, set frequency, close — entirely within one
+    frame.
+  - **FF2 — soft gate.** D from PC4-derived net, CK = PC3, Q drives
+    PIT `GATE0` via an IC8C 7417 buffer. The "PC3 enables sound"
+    simplification was already modelled.
+- **The bug.** IoBus had been dropping `$E008` writes with a
+  guess-comment calling them "interrupt latch clear". Nothing in the
+  pipeline reflected the hard gate, so:
+  - Boot tone: the synth started the tone but never stopped it. We
+    were getting *no* boot tone before this because the synth wasn't
+    silenced at the close, but it was silenced indirectly via PIT
+    control writes mid-boot.
+  - MUSIC: produced one continuous re-pitched warble instead of
+    discrete notes, because each note opened C0 and never closed it.
+  - Game sounds: anything that toggled `$E008` to gate audio (most
+    sound effects) was silent.
+- **The fix** (`66d83b0`). `Sound.HardGate` volatile bool added;
+  `Sound.FeedLoop` ANDs `Enabled && HardGate` to decide whether to
+  emit samples; `IoBus.MemOut` latches `$E008 D0` into `HardGate`
+  and raises an `OnE008Write` event for diagnostics. `MZ700.Reset`
+  clears `HardGate` (FF1.CL is the schematic RESET line).
+- **Sound Diagnostic window** (`66d83b0`): Debug → Sound Diagnostic
+  surfaces a live event log of PIT control / counter writes, PC3
+  transitions, and `$E008` traffic, alongside a state pane showing
+  soft gate, hard gate, and the audible AND.
+- **Boot tone is sub-frame.** Once both gates were modelled, the
+  ROM's open-close cycle showed up in the diagnostic log as
+  `$E008 ← $01` immediately followed by `$E008 ← $00` within one
+  frame — confirming the "missing" boot tone is *inherently*
+  inaudible on real hardware too (cross-checked against EmuZ-700,
+  which also produces no boot tone). The literal beep was never the
+  problem; the audio pipeline gap was.
+- **Sound reference encoded** in `Hardware/Mz700SoundReference.cs`
+  using the same canonical-reference pattern: counter spec,
+  programmed mode, gate source, speaker-NAND gate, expected events
+  (boot tone, MUSIC). Cited from the service manual where possible
+  and marked Empirical where derived from in-emulator observation.
+
+### 2026-06-20 — Project rename, MIT license, v1.0.0
+
+- **Project renamed MZ700Emul → MZRaku** (`977e745`, `c0b94e3`).
+  Portmanteau of MZ + Japanese 楽 (*raku*, "easy / comfortable /
+  relaxed"). The old name was a working title that read fine as
+  a directory but always sat awkwardly as a brand. Sweep: namespace,
+  `MZRaku.csproj` / `AssemblyName` / `RootNamespace` /
+  `ApplicationIcon`, output exe, README + docs, embedded UI strings
+  (title bar, About header, usage text, HID Diagnostic header). Class
+  names that model the *hardware* (`MZ700`, `MZ700Memory`,
+  `Mz700SoundReference`) deliberately unchanged. GitHub repo renamed
+  to `sgillon/MZRaku` via `gh repo rename`; the old
+  `sgillon/Mz700Emul` URL continues to redirect, so existing
+  bookmarks keep working.
+- **MIT license** (`d408b51`) — first explicit license. `LICENSE`
+  at repo root; `NOTICES.md` acknowledges the GPL-v2 ZEXDOC/ZEXALL
+  binaries in `tools/CPM/` as a "mere aggregation" under GPL v2 §2
+  (no GPL code is linked into the MZRaku build, and the release
+  zips don't redistribute the binaries — they remain in the source
+  tree as guest-software test inputs only). Both release zips
+  bundle the LICENSE.
+- **v1.0.0 tagged and released** with `-dotnet8.zip` (~270 KB,
+  framework-dependent) and `-standalone.zip` (~63 MB, self-contained,
+  `EnableCompressionInSingleFile=true`).
+
 ---
 
 ## Architectural decisions worth knowing
@@ -370,10 +572,42 @@ correct entry points.*
 `<PublishSingleFile>`, `<DebugType>embedded</DebugType>`, and
 `<CopyToPublishDirectory>Never</CopyToPublishDirectory>` on the
 conditional ROM/BASIC include. The framework-dependent release is
-~232 KB; the self-contained release is ~63 MB. Dev's local Sharp
-ROMs / BASIC never leak into a publish. *Don't relax the
-`CopyToPublishDirectory=Never` without an alternative copyright
-guard.*
+~270 KB; the self-contained release is ~63 MB (the latter requires
+`-p:EnableCompressionInSingleFile=true` at publish time — without it,
+the bundle balloons to ~160 MB). Dev's local Sharp ROMs / BASIC never
+leak into a publish. *Don't relax the `CopyToPublishDirectory=Never`
+without an alternative copyright guard.*
+
+### Speaker NAND dual-gate model (2026-06-19)
+
+MZ-700 audio is gated by two independent flip-flops on IC7E LS74,
+not one. Both must be open for audible sound:
+
+- **Soft gate (FF2)** — clocked by PPI PC3; Q drives PIT GATE0 via
+  IC8C 7417. Modelled as `Sound.Enabled`.
+- **Hard gate (FF1)** — D=bus D0, clocked on writes to `$E008` (the
+  CSE2-decoded address), CL=system RESET; Q is the second input of
+  the speaker-amp NAND. Modelled as `Sound.HardGate`. Writing
+  `D0=1` to `$E008` enables audible sound; `D0=0` silences it
+  regardless of the PIT counter's state.
+
+The `FeedLoop` ANDs the two. *Don't fold either gate into the other,
+even when only one program seems to use one of them — boot tone uses
+hard-gate-only transitions to start and stop within a single frame,
+and that's what makes the literal "boot beep" inaudible on real
+hardware too.* Canonical specification in
+`Hardware/Mz700SoundReference.cs`.
+
+### Canonical references + startup validation (2026-06-13)
+
+When the same data is encoded across several files, build one
+reference file that holds it as data and have the consumer files
+validate against it at startup. The keyboard matrix
+(`Mz700MatrixReference`) and the sound subsystem
+(`Mz700SoundReference`) both follow this shape. A drift surfaces as a
+loud `MessageBox` at boot — not as a typing bug weeks later. *When
+introducing a new consumer of an already-referenced dataset, derive
+from or validate against the reference; don't re-encode by hand.*
 
 ---
 
@@ -391,15 +625,22 @@ automatically; documented here for human reference.
 | **Local working dirs `_*/`** | Any folder used for scratch / session / downloaded-reference material. Prefix with `_`. Auto-ignored. | 2026-06-01. |
 | **Portable settings** | All user-facing config persists next to the executable. Never `%APPDATA%` / registry / per-user. "Survives reinstalls" need is met by Import/Export, not by moving live config. | 2026-06-04, during keyboard-editor planning. |
 | **Self-documenting INI** | Every `settings.ini` section must explain its format inline. A user opening the file understands every line without reading code. | 2026-06-04, when adding `[CharMap]`. `[KeyOverrides]` was the bar; older sections retrofitted in the same commit. |
+| **Canonical reference + startup validation** | Data encoded across multiple parallel files (keyboard matrix, sound subsystem). Build one reference + validators rather than chasing drifts one at a time. | 2026-06-13, after the MZ CTRL slot drift hid for weeks across four files. Re-applied 2026-06-19 for the sound topology. |
 
 ---
 
 ## Current status
 
-The project has been at "meets the original goals" since the trek
-var-bug arc on 2026-05-23. Everything since has been polish and
-expansion: settings UI, layered keyboard model, diagnostics surfaces,
-the in-flight keyboard editor.
+The project shipped **v1.0.0** as `sgillon/MZRaku` on 2026-06-20 —
+its first stable release, and the moment the project name moved from
+the working-title `MZ700Emul` to its brand `MZRaku` (portmanteau of
+MZ + Japanese 楽 *raku*, "easy / comfortable / relaxed"). The MZ-700
+hardware model has been at "meets the original goals" since the trek
+var-bug arc on 2026-05-23; everything since has been polish, expansion
+and structural tidy-up: settings UI, layered keyboard model, diagram-
+first keyboard editor, diagnostics surfaces, the canonical-reference
+pattern (matrix + sound), debugger / window-geometry persistence,
+full-screen + scanlines, and the speaker-NAND dual-gate audio fix.
 
 Tagged releases:
 - **v0.0.5-preview** (2026-05-16) — first public release.
@@ -407,17 +648,24 @@ Tagged releases:
   dropped, single-file publish.
 - **v0.0.7-preview** (2026-05-31) — tabbed Settings dialog, layered
   keyboard model, auto-typer rewrite, various key-mapping fixes.
-
-Next release (v0.0.8) will likely cut once Phase A of the
-keyboard-editor work is complete and Phase B has landed at least
-in some form.
+- **v0.0.8-preview** (2026-06-14) — canonical matrix reference, MZ
+  Ctrl reachability fix, F5 wired, AboutForm, diagram-first keyboard
+  editor (Phase 2), `UI/` reorganisation.
+- **v1.0.0** (2026-06-20) — first stable release; project renamed
+  MZ700Emul → MZRaku; MIT license applied; speaker-NAND dual-gate
+  sound fix; full-screen + scanlines; persisted window geometry +
+  breakpoints; MZ-shift assertion race fix.
 
 For the open backlog, see the `project_feature_backlog` memory.
-Highlights: WndProc L/R disambiguation (fixes MZ Ctrl bug),
-BASIC-aware debugger panes, `Z80Core.Tests/` automated test
-project, Z80Core spin-out to its own repo.
+Highlights queued for post-v1 polish: re-validating the empirical
+`CyclesPerTempoToggle = 35469` against real hardware now that
+discrete MUSIC notes make stopwatching meaningful; a proper
+scanlines filter (with intensity / line-size controls) that holds
+up at full-screen scale; bank-1 click-to-type completion in the
+Font Sheet; auto-typer speed-up; L/R Ctrl distinction.
 
-Stretch goals (not committed): cross-platform port (Avalonia + Silk.NET
-evaluation), MZ-80K and MZ-80B support on the same codebase,
-full-screen mode, scanlines overlay, MZ-1P01 plotter emulation, a
-broader 8-bit CPU library family.
+Stretch goals (not committed): cross-platform port (Avalonia +
+Silk.NET evaluation), MZ-80K and MZ-80B support on the same
+codebase, `Z80Core` spin-out to its own repository and the broader
+8-bit CPU library family, MZ-1P01 plotter emulation, BASIC source
+editor + BASIC-aware debugger panes.
