@@ -3,9 +3,9 @@ using System.Drawing;
 using System.IO;
 using System.Text;
 using System.Windows.Forms;
-using MZ700Emul.Hardware;
+using MZRaku.Hardware;
 
-namespace MZ700Emul;
+namespace MZRaku;
 
 /// <summary>
 /// Live "what just happened" view of host keyboard + joystick input and
@@ -135,7 +135,7 @@ public sealed class HidDiagnosticForm : Form
     private string BuildFullDump()
     {
         var sb = new StringBuilder();
-        sb.AppendLine($"MZ700Emul HID Diagnostic — {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        sb.AppendLine($"MZRaku HID Diagnostic — {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
         sb.AppendLine();
         sb.AppendLine("=== Host input (Windows side) ===");
         sb.AppendLine(BuildHostText());

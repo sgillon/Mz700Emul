@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 
-namespace MZ700Emul.Hardware;
+namespace MZRaku.Hardware;
 
 /// <summary>
 /// MZ-700 text-mode video renderer.

@@ -1,4 +1,4 @@
-# MZ700Emul
+# MZRaku
 
 A Sharp MZ-700 emulator written in C# / .NET 8 (WinForms). The aims of this emulator are:
 
@@ -37,7 +37,7 @@ core is also a separate class-library project (`Z80Core.dll`),
 reusable for other Z80-based machines.
 
 **Single-file release publish** — `dotnet publish -c Release` produces
-a single self-extracting `MZ700Emul.exe` (about 300 KB) with no DLLs,
+a single self-extracting `MZRaku.exe` (about 300 KB) with no DLLs,
 no `.pdb`, no JSON config files alongside. Framework-dependent
 (assumes .NET 8 Desktop Runtime is installed); sound goes through
 Windows' built-in `winmm.dll` directly (the same DLL the joystick
@@ -57,10 +57,10 @@ drop them into the install directory:
 | `mz700fon.int` | `roms\` | The character-generator ROM (font data). |
 | `1Z-013B.mzf` | `basic\` (or `roms\`) | Sharp's S-BASIC interpreter, supplied on cassette. |
 
-Layout next to `MZ700Emul.exe`:
+Layout next to `MZRaku.exe`:
 
 ```
-MZ700Emul.exe
+MZRaku.exe
 roms\
   1z-013a.rom
   mz700fon.int
@@ -76,7 +76,7 @@ it looked.
 ### Using the emulator from a game launcher
 
 See [Launcher setup](docs/usage/launcher-setup.md) for step-by-step
-instructions on wiring MZ700Emul into popular Windows game launchers
+instructions on wiring MZRaku into popular Windows game launchers
 (Launchbox so far, more to follow).
 
 ## Build & run
@@ -89,7 +89,7 @@ dotnet run
 Or once built:
 
 ```
-.\[Working dir]\MZ700Emul.exe [--basic] [path\to\cassette.mzf]
+.\[Working dir]\MZRaku.exe [--basic] [path\to\cassette.mzf]
 ```
 
 The launcher waits for the monitor to display its `MONITOR 1Z*` prompt
@@ -99,10 +99,10 @@ regardless of host speed.
 ### Producing a release build
 
 ```
-dotnet publish -c Release -r win-x64 --self-contained false -o publish\MZ700Emul
+dotnet publish -c Release -r win-x64 --self-contained false -o publish\MZRaku
 ```
 
-Release publishes a single self-extracting `MZ700Emul.exe` (debug
+Release publishes a single self-extracting `MZRaku.exe` (debug
 symbols embedded, framework-dependent). Assumes the .NET 8 Desktop
 Runtime is installed on the target machine. Drop the user-supplied
 ROMs / BASIC alongside the exe per [Quickstart](#quickstart).
@@ -184,7 +184,7 @@ Topic-by-topic guides live under [`docs/usage/`](docs/usage/):
   any Windows-recognised game controller.
 - [Hardware notes](docs/usage/hardware-notes.md) — MZ-700 hardware
   quirks the code learned the hard way (PIT topology, $E008, etc.).
-- [Launcher setup](docs/usage/launcher-setup.md) — wiring MZ700Emul
+- [Launcher setup](docs/usage/launcher-setup.md) — wiring MZRaku
   into Launchbox (and other launchers to come).
 - [Project history](docs/history.md) — chronological record of major
   changes and architectural decisions, for the curious or for

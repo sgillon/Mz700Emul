@@ -5,7 +5,7 @@ using System.IO;
 using System.Text;
 using System.Windows.Forms;
 
-namespace MZ700Emul;
+namespace MZRaku;
 
 /// <summary>
 /// Hex / ASCII memory viewer — a companion to the debugger window.
@@ -245,7 +245,7 @@ public sealed class MemoryViewerForm : Form
     private void WriteSnapshot(string path, ushort start, ushort end)
     {
         using var w = new StreamWriter(path, append: false, encoding: Encoding.UTF8);
-        w.WriteLine($"; MZ700Emul RAM snapshot");
+        w.WriteLine($"; MZRaku RAM snapshot");
         w.WriteLine($"; range: ${start:X4}–${end:X4}  ({end - start + 1} bytes)");
         w.WriteLine($"; PC=${_machine.Cpu.PC:X4}  SP=${_machine.Cpu.SP:X4}  AF=${_machine.Cpu.AF:X4}  BC=${_machine.Cpu.BC:X4}  DE=${_machine.Cpu.DE:X4}  HL=${_machine.Cpu.HL:X4}");
         w.WriteLine($"; captured: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");

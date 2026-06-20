@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
-using MZ700Emul.Hardware;
+using MZRaku.Hardware;
 
-namespace MZ700Emul;
+namespace MZRaku;
 
 /// <summary>
 /// Reusable user-control for capturing a single PC keystroke for the

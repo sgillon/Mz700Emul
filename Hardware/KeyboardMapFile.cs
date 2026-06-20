@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace MZ700Emul.Hardware;
+namespace MZRaku.Hardware;
 
 /// <summary>
 /// Save / load helpers for the <c>.mzkbd</c> keyboard-mapping exchange
@@ -32,7 +32,7 @@ public static class KeyboardMapFile
     {
         using var w = new StreamWriter(path);
         w.WriteLine("; MZ-700 Keyboard mapping file");
-        w.WriteLine($"; Saved {DateTime.Now:yyyy-MM-dd HH:mm:ss} by MZ700Emul.");
+        w.WriteLine($"; Saved {DateTime.Now:yyyy-MM-dd HH:mm:ss} by MZRaku.");
         w.WriteLine(";");
         w.WriteLine("; Contains user-customised PC-keyboard bindings only — the");
         w.WriteLine("; emulator's built-in defaults are still applied and don't");

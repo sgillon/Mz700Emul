@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using Z80Core;
 
-namespace MZ700Emul.Hardware;
+namespace MZRaku.Hardware;
 
 /// <summary>
 /// MZF cassette image loader + monitor tape-routine trap.

@@ -1,6 +1,6 @@
 using System;
 
-namespace MZ700Emul.Hardware;
+namespace MZRaku.Hardware;
 
 /// <summary>
 /// Intel 8255 PPI emulation for MZ-700.

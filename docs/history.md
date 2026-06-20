@@ -1,6 +1,6 @@
 # Project history
 
-A chronological record of how MZ700Emul evolved, written for a future
+A chronological record of how MZRaku evolved, written for a future
 maintainer (most likely the project owner one year on). Focuses on
 the *what* and *why* of significant changes — what shipped, what
 decisions were made, what rationale drove them — at the level of
@@ -102,7 +102,7 @@ First "Initial commit: Sharp MZ-700 emulator (C#/.NET WinForms)" was
   Quickstart explicitly instructs sourcing user-supplied ROMs.
 - BASIC-missing modal fires consistently across all entry points
   (CLI, BASIC-cassette auto-load, Load BASIC source, menu).
-- `MZ700Emul.csproj` switched to a conditional glob so local
+- `MZRaku.csproj` switched to a conditional glob so local
   copyrighted files don't break a fresh-clone build and never leak
   into a publish.
 - `.gitignore` patterns added to guard user-supplied ROM / BASIC /

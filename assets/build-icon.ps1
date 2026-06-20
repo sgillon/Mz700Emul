@@ -1,4 +1,4 @@
-# Regenerates MZ700Emul.ico (project root) from MZONLYlogo.png (this folder).
+# Regenerates MZRaku.ico (project root) from MZONLYlogo.png (this folder).
 #
 # Run from the repo root:
 #     powershell -NoProfile -ExecutionPolicy Bypass -File assets\build-icon.ps1
@@ -14,7 +14,7 @@ Add-Type -AssemblyName System.Drawing
 
 $root    = Split-Path -Parent $PSScriptRoot
 $srcPath = Join-Path $PSScriptRoot 'MZONLYlogo.png'
-$outPath = Join-Path $root        'MZ700Emul.ico'
+$outPath = Join-Path $root        'MZRaku.ico'
 
 if (-not (Test-Path $srcPath)) { throw "Source not found: $srcPath" }
 

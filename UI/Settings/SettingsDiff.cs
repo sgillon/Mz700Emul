@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Forms;
-using MZ700Emul.Hardware;
+using MZRaku.Hardware;
 
-namespace MZ700Emul;
+namespace MZRaku;
 
 /// <summary>
 /// Immutable snapshot of the user-visible settings state, taken before

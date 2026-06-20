@@ -4,9 +4,9 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
 using System.Windows.Forms;
-using MZ700Emul.Hardware;
+using MZRaku.Hardware;
 
-namespace MZ700Emul;
+namespace MZRaku;
 
 /// <summary>
 /// Owner-drawn diagram of the MZ-700 physical keyboard, rendered from

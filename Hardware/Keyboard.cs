@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Forms;
 
-namespace MZ700Emul.Hardware;
+namespace MZRaku.Hardware;
 
 /// <summary>
 /// MZ-700 keyboard matrix. The 8255 PPI writes a strobe value to Port A

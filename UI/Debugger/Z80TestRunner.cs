@@ -4,7 +4,7 @@ using System.Text;
 using System.Threading;
 using Z80Core;
 
-namespace MZ700Emul;
+namespace MZRaku;
 
 /// <summary>
 /// Runs a CP/M .com Z80 test ROM (ZEXDOC, ZEXALL, etc.) against the

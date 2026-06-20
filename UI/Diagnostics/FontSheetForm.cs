@@ -1,8 +1,8 @@
 using System.Drawing;
 using System.Windows.Forms;
-using MZ700Emul.Hardware;
+using MZRaku.Hardware;
 
-namespace MZ700Emul;
+namespace MZRaku;
 
 /// <summary>
 /// Diagnostic view of the loaded MZ-700 character ROM — all 512 glyphs

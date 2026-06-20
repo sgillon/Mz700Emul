@@ -3,7 +3,7 @@ bin/
 obj/
 publish/
 publish-*/
-MZ700Emul-*.zip
+MZRaku-*.zip
 
 # Visual Studio
 .vs/

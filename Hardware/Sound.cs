@@ -1,6 +1,6 @@
 using System;
 
-namespace MZ700Emul.Hardware;
+namespace MZRaku.Hardware;
 
 /// <summary>
 /// Square-wave sound driven by 8253 counter-0 reload value and 8255 PC3 gate.

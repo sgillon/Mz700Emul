@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace MZ700Emul.Hardware;
+namespace MZRaku.Hardware;
 
 /// <summary>
 /// Static translation: Unicode character → MZ-700 matrix position +

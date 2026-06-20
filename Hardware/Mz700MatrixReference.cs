@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace MZ700Emul.Hardware;
+namespace MZRaku.Hardware;
 
 /// <summary>
 /// Canonical MZ-700 keyboard matrix reference — the single source of

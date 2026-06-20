@@ -1,8 +1,8 @@
 using System;
 using System.Windows.Forms;
-using MZ700Emul.Hardware;
+using MZRaku.Hardware;
 
-namespace MZ700Emul;
+namespace MZRaku;
 
 internal static class Program
 {
@@ -84,7 +84,7 @@ internal static class Program
             {
                 MessageBox.Show(
                     "MZ-700 Emulator\n\n" +
-                    "Usage: MZ700Emul.exe [--basic] [--display=N] [path\\to\\cassette.mzf|.zip]\n\n" +
+                    "Usage: MZRaku.exe [--basic] [--display=N] [path\\to\\cassette.mzf|.zip]\n\n" +
                     "  --basic         Force BASIC to be loaded at startup. Usually not\n" +
                     "                  needed: BASIC cassettes auto-load BASIC anyway.\n" +
                     "  --display=N     Override the persisted window scale for this run:\n" +

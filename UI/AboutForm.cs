@@ -6,7 +6,7 @@ using System.Linq;
 using System.Reflection;
 using System.Windows.Forms;
 
-namespace MZ700Emul;
+namespace MZRaku;
 
 /// <summary>
 /// Help → About dialog. Surfaces project name, version (read from the
@@ -20,7 +20,7 @@ public sealed class AboutForm : Form
 
     public AboutForm()
     {
-        Text = "About Sharp MZ-700 Emulator";
+        Text = "About MZRaku";
         FormBorderStyle = FormBorderStyle.FixedDialog;
         StartPosition = FormStartPosition.CenterParent;
         MinimizeBox = false;
@@ -99,7 +99,7 @@ public sealed class AboutForm : Form
         };
         textStack.Controls.Add(new Label
         {
-            Text = "Sharp MZ-700 Emulator",
+            Text = "MZRaku",
             Font = new Font(SystemFonts.MessageBoxFont!.FontFamily, 14f, FontStyle.Bold),
             AutoSize = true,
             Margin = new Padding(0),
@@ -217,7 +217,7 @@ public sealed class AboutForm : Form
         // build-date proxy.
         try
         {
-            var exe = Path.Combine(AppContext.BaseDirectory, "MZ700Emul.exe");
+            var exe = Path.Combine(AppContext.BaseDirectory, "MZRaku.exe");
             if (File.Exists(exe)) return File.GetLastWriteTime(exe);
         }
         catch { /* fall through */ }
@@ -243,7 +243,7 @@ public sealed class AboutForm : Form
         {
             var asm = typeof(AboutForm).Assembly;
             var name = asm.GetManifestResourceNames()
-                .FirstOrDefault(n => n.EndsWith("MZ700Emul.ico", StringComparison.OrdinalIgnoreCase));
+                .FirstOrDefault(n => n.EndsWith("MZRaku.ico", StringComparison.OrdinalIgnoreCase));
             if (name == null) return null;
             using var s = asm.GetManifestResourceStream(name);
             return s == null ? null : new Icon(s);

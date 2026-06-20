@@ -7,7 +7,7 @@ using System.Text;
 using System.Windows.Forms;
 using Z80Core;
 
-namespace MZ700Emul;
+namespace MZRaku;
 
 /// <summary>
 /// Debugger window. Phase 1 — execution control (pause/resume/single-step/

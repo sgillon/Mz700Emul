@@ -1,7 +1,7 @@
 using System.Drawing;
 using System.Windows.Forms;
 
-namespace MZ700Emul;
+namespace MZRaku;
 
 /// <summary>
 /// Temporary host for <see cref="KeyboardMatrixGrid"/> during Phase A

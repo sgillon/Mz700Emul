@@ -1,7 +1,7 @@
 using System;
 using System.Windows.Forms;
 
-namespace MZ700Emul;
+namespace MZRaku;
 
 // Local WinForms control subclasses that turn off the WM_ERASEBKGND →
 // WM_PAINT erase-then-redraw flicker that bites every time we set new

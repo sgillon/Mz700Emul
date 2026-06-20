@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace MZ700Emul.Hardware;
+namespace MZRaku.Hardware;
 
 /// <summary>
 /// Reverse lookup from MZ-700 display code to the (row, col, MzShift)

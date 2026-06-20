@@ -1,6 +1,6 @@
 using System;
 
-namespace MZ700Emul.Hardware;
+namespace MZRaku.Hardware;
 
 /// <summary>
 /// Intel 8253 PIT emulation for MZ-700.

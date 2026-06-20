@@ -4,7 +4,7 @@ using System.IO;
 using System.Threading;
 using System.Windows.Forms;
 
-namespace MZ700Emul;
+namespace MZRaku;
 
 /// <summary>
 /// Modeless companion window that runs a CP/M Z80 test ROM (ZEXDOC,

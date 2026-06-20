@@ -4,9 +4,9 @@ using System.Drawing.Drawing2D;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
-using MZ700Emul.Hardware;
+using MZRaku.Hardware;
 
-namespace MZ700Emul;
+namespace MZRaku;
 
 public sealed class MainForm : Form
 {
@@ -86,7 +86,7 @@ public sealed class MainForm : Form
         _machine.Keyboard.Overrides = _settings.KeyOverrides;
         CharMap.Overrides = _settings.CharMapOverrides;
 
-        Text = "Sharp MZ-700 Emulator";
+        Text = "MZRaku";
         Icon = LoadEmbeddedIcon();
         KeyPreview = true;
         AllowDrop = true;
@@ -1157,7 +1157,7 @@ public sealed class MainForm : Form
         {
             var asm = typeof(MainForm).Assembly;
             var name = asm.GetManifestResourceNames()
-                .FirstOrDefault(n => n.EndsWith("MZ700Emul.ico", StringComparison.OrdinalIgnoreCase));
+                .FirstOrDefault(n => n.EndsWith("MZRaku.ico", StringComparison.OrdinalIgnoreCase));
             if (name == null) return null;
             using var s = asm.GetManifestResourceStream(name);
             return s == null ? null : new Icon(s);

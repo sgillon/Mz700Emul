@@ -162,7 +162,7 @@ a release, update the checklist before fixing the bug.
 
 ## Release packaging
 
-- [ ] Version bumped in `MZ700Emul.csproj` (`<Version>` element).
+- [ ] Version bumped in `MZRaku.csproj` (`<Version>` element).
 - [ ] About dialog shows the bumped version (sanity check — reads
       from the assembly's InformationalVersion).
 - [ ] README planned-work / known-limitations sections reflect what

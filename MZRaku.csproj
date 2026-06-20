@@ -7,9 +7,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
-    <ApplicationIcon>MZ700Emul.ico</ApplicationIcon>
-    <AssemblyName>MZ700Emul</AssemblyName>
-    <RootNamespace>MZ700Emul</RootNamespace>
+    <ApplicationIcon>MZRaku.ico</ApplicationIcon>
+    <AssemblyName>MZRaku</AssemblyName>
+    <RootNamespace>MZRaku</RootNamespace>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <!-- Version is surfaced in the About dialog (Help → About). The
          dialog reads AssemblyInformationalVersion at runtime, so bumping
@@ -49,12 +49,12 @@
        inadvertently pulling in local working files (e.g. icon source
        PNGs in _hardwareimages/). -->
   <ItemGroup>
-    <!-- MZ700Emul.ico is also embedded as the Win32 resource via
+    <!-- MZRaku.ico is also embedded as the Win32 resource via
          <ApplicationIcon> above (used by Explorer, taskbar, alt-tab);
          the EmbeddedResource entry lets MainForm load it at runtime
          for the window title-bar icon. Source PNG + regen script
          live in assets/. -->
-    <EmbeddedResource Include="MZ700Emul.ico" />
+    <EmbeddedResource Include="MZRaku.ico" />
   </ItemGroup>
 
   <!-- Copyrighted ROM / BASIC images are NOT shipped with this project.

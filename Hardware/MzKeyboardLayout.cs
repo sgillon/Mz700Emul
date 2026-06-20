@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace MZ700Emul.Hardware;
+namespace MZRaku.Hardware;
 
 /// <summary>
 /// Physical layout of the MZ-700 keyboard. Drives the

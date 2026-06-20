@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
-using MZ700Emul.Hardware;
+using MZRaku.Hardware;
 
-namespace MZ700Emul;
+namespace MZRaku;
 
 /// <summary>
 /// User preferences persisted across runs as a small INI file
@@ -163,7 +163,7 @@ public sealed class Settings
             sb.AppendLine();
 
             sb.AppendLine("[Roms]");
-            sb.AppendLine("; Paths to the Sharp firmware files. Stored relative to MZ700Emul.exe");
+            sb.AppendLine("; Paths to the Sharp firmware files. Stored relative to MZRaku.exe");
             sb.AppendLine("; when the file lives at-or-below it (portable installs), absolute");
             sb.AppendLine("; otherwise. If a path goes stale (file moved or deleted) the next");
             sb.AppendLine("; launch re-scans the standard locations and patches the entry up.");

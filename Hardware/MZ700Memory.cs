@@ -1,7 +1,7 @@
 using System;
 using Z80Core;
 
-namespace MZ700Emul.Hardware;
+namespace MZRaku.Hardware;
 
 /// <summary>
 /// MZ-700 memory map:
