@@ -1,6 +1,6 @@
 # Release readiness check
 
-A short manual smoke test to run before tagging a preview/release. Aim
+A short manual smoke test to run before tagging a release. Aim
 for ~10-15 minutes end-to-end. The point is to catch behaviour that
 compiles fine but doesn't *work* — things automated tests don't see.
 
@@ -10,10 +10,13 @@ a release, update the checklist before fixing the bug.
 ## Build
 
 - [ ] `dotnet publish` (Release, single-file) completes with no warnings.
+      Output filename is `MZRaku.exe`.
 - [ ] Publish output does **not** contain `1z-013a.rom`, `mz700fon.int`,
       or `1Z-013B.mzf` (Sharp copyright — must not be redistributed).
 - [ ] Exe runs on a clean folder (no `settings.ini`) and auto-detects
       the three system files from `roms/` next to it.
+- [ ] Window title bar reads "MZRaku" (not "Sharp MZ-700 Emulator" — that
+      was the pre-v1 wording).
 - [ ] Startup matrix validation stays silent — no "Matrix validation
       drift" MessageBox. (Means `Mz700MatrixReference`, `SpecialKeyMap`,
       `CharMap`, and `MzKeyboardLayout` all agree.)
@@ -122,6 +125,38 @@ a release, update the checklist before fixing the bug.
 - [ ] Load `trek.mzf` from cassette; SR command produces a sensor
       readout without "var parse" errors.
 
+## Sound
+
+- [ ] Boot tone: silence at the monitor prompt (real hardware doesn't
+      sustain a tone here; the ROM opens then closes the speaker NAND
+      within one frame — see [[project-v1-plan]] / `Mz700SoundReference`).
+- [ ] BASIC `MUSIC "CDEFGAB"` plays seven discrete notes — not one
+      continuous re-pitched tone. (Regression canary for the $E008 D0
+      hard-gate latch fix in `66d83b0`.)
+- [ ] In a game with sound effects (Space Panic, Star Trek): audible
+      events fire when expected. Game-specific noises that were missing
+      pre-`66d83b0` should now play.
+- [ ] **Debug → Sound Diagnostic…** opens. With BASIC `MUSIC` running,
+      the event log shows interleaved `C0 <- $XX` reload writes,
+      `$E008 ← $01` / `$E008 ← $00` hard-gate toggles, and PC3 soft-gate
+      transitions. State pane shows soft gate / hard gate / audible AND
+      updating live.
+
+## Display
+
+- [ ] **View → Full-screen** (Alt+Enter) switches to borderless
+      full-screen on the same monitor; pressing again returns to the
+      previous windowed size and position.
+- [ ] `--display=full` (or `--display=fs`) on the command line launches
+      directly into full-screen for that run only; `settings.ini`
+      `Display.Scale` is unchanged.
+- [ ] **View → Scanlines** (Ctrl+L) toggles the CRT-style overlay; the
+      menu checkmark tracks state and the setting persists across
+      restart.
+- [ ] `--scanlines=on` / `--scanlines=off` overrides the persisted
+      setting for that run only.
+- [ ] Main window geometry is restored on relaunch (size + position).
+
 ## Joystick
 
 - [ ] Settings → Joystick tab shows connected gamepad and current
@@ -141,30 +176,47 @@ a release, update the checklist before fixing the bug.
       pauses at the breakpoint.
 - [ ] Step (F10/F11) advances PC one instruction.
 - [ ] Memory viewer Snap → press a few keys → Diff shows changed bytes.
+- [ ] Debugger and Memory Viewer window geometry (size + position)
+      survives close-and-reopen and across restart.
+- [ ] Breakpoint list survives close-and-reopen of the debugger and
+      across a relaunch of the emulator.
 
 ## Settings
 
-- [ ] Ctrl+S opens the settings dialog.
+- [ ] **File → Settings → ROMs…** (Ctrl+S) opens the dialog on the
+      ROMs tab.
+- [ ] **File → Settings → Display…** (Ctrl+Shift+D) opens on Display.
+- [ ] **File → Settings → Keyboard…** (Ctrl+Shift+K) opens on Keyboard.
+- [ ] **File → Settings → Joystick…** (Ctrl+Shift+J) opens on Joystick.
 - [ ] Tab order is ROMs / Display / Keyboard / Joystick.
 - [ ] Changing Display Scale and clicking Apply takes effect without
       restart.
 - [ ] `settings.ini` after first run contains `[Display]`, `[Roms]`,
-      `[Joystick]`, `[KeyOverrides]`, `[CharMap]` sections — each
-      with its own inline self-documenting comment.
+      `[Joystick]`, `[KeyOverrides]`, `[CharMap]`, `[Window]`,
+      `[Debugger]`, `[MemoryViewer]`, and `[Breakpoints]` sections —
+      each with its own inline self-documenting comment.
 
 ## Help
 
 - [ ] **Help → About…** opens the AboutForm (not a MessageBox);
-      shows the icon, the version (matches `<Version>` in the
-      csproj), a build date, both project + launcher-setup GitHub
-      links open in the browser when clicked, and Sharp / Claude
-      acknowledgements.
+      title says "About MZRaku", header label says "MZRaku", version
+      matches `<Version>` in the csproj, a build date is shown, both
+      project + launcher-setup GitHub links open in the browser when
+      clicked and resolve to `sgillon/MZRaku`, and Sharp / Claude
+      acknowledgements are present.
 
 ## Release packaging
 
-- [ ] Version bumped in `MZRaku.csproj` (`<Version>` element).
+- [ ] Version bumped in `MZRaku.csproj` (`<Version>` element). For a
+      stable release this is a bare semver string (e.g. `1.0.0`); for
+      a preview it carries the `-preview` suffix.
 - [ ] About dialog shows the bumped version (sanity check — reads
       from the assembly's InformationalVersion).
 - [ ] README planned-work / known-limitations sections reflect what
       actually shipped.
+- [ ] Framework-dependent zip built: `MZRaku-<version>-dotnet8.zip`
+      (assumes .NET 8 Desktop Runtime on target).
+- [ ] Self-contained zip built: `MZRaku-<version>-standalone.zip`
+      (no .NET runtime required on target).
+- [ ] Both zips extract cleanly to an empty folder and run.
 - [ ] Tag created, pushed, release notes drafted via `gh release create`.
