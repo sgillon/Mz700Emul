@@ -609,6 +609,38 @@ loud `MessageBox` at boot — not as a typing bug weeks later. *When
 introducing a new consumer of an already-referenced dataset, derive
 from or validate against the reference; don't re-encode by hand.*
 
+### Z80Core spun out to its own repository (2026-06-28)
+
+The Z80 CPU emulator that had been kept clean-room inside MZRaku
+since the 2026-05-23 extraction now lives in its own repo at
+[sgillon/Z80Core](https://github.com/sgillon/Z80Core), tagged
+**v1.0.0**. MZRaku consumes it as a git submodule mounted at the
+same `Z80Core/` path, so the existing `<ProjectReference>` resolves
+unchanged. The clean-room rule still applies inside the standalone
+repo. Fresh clones now need `git submodule update --init` (or
+`--recurse-submodules`) before `dotnet build`.
+
+The new repo carries comprehensive documentation under `docs/`:
+`usage.md` (how to wire the core into a host), `architecture.md`
+(internals — partial-class split, opcode decoding, prefix state
+machine, WZ/MEMPTR, cycle accounting), `debugger-hooks.md`
+(breakpoints, PC trace, the PreStep ROM-trap pattern with worked
+examples), `disassembler.md` (side-effect-aware reads), and
+`zex-validation.md`.
+
+The ZEXDOC/ZEXALL test harness that used to live in MZRaku's Debug
+menu (`UI/Debugger/Z80TestRunner.cs` + `Z80TestForm.cs`) moved to
+the new repo as `samples/ZexHarness/`, a standalone console app
+purely on top of the public surface. MZRaku no longer carries
+`tools/CPM/` or `NOTICES.md` as a result. *To re-validate the
+emulator's CPU after a Z80Core change, clone Z80Core, `dotnet run
+--project samples/ZexHarness` against `zexdoc.com` / `zexall.com`,
+and check every line ends in `OK`.*
+
+Distribution model is git-submodule for now, not NuGet — the user
+wanted reuse across personal projects without a publish/version
+cycle yet. NuGet remains an option for later.
+
 ---
 
 ## Principles
@@ -655,6 +687,9 @@ Tagged releases:
   MZ700Emul → MZRaku; MIT license applied; speaker-NAND dual-gate
   sound fix; full-screen + scanlines; persisted window geometry +
   breakpoints; MZ-shift assertion race fix.
+- **Z80Core v1.0.0** (2026-06-28, [sgillon/Z80Core](https://github.com/sgillon/Z80Core))
+  — Z80 core split into its own repo, consumed back as a git
+  submodule. Comprehensive `docs/`, MIT licensed, ZexHarness sample.
 
 For the open backlog, see the `project_feature_backlog` memory.
 Highlights queued for post-v1 polish: re-validating the empirical
@@ -666,6 +701,5 @@ Font Sheet; auto-typer speed-up; L/R Ctrl distinction.
 
 Stretch goals (not committed): cross-platform port (Avalonia +
 Silk.NET evaluation), MZ-80K and MZ-80B support on the same
-codebase, `Z80Core` spin-out to its own repository and the broader
-8-bit CPU library family, MZ-1P01 plotter emulation, BASIC source
-editor + BASIC-aware debugger panes.
+codebase, NuGet distribution for Z80Core, MZ-1P01 plotter emulation,
+BASIC source editor + BASIC-aware debugger panes.
