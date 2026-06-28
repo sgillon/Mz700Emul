@@ -17,4 +17,12 @@
     <DebugType>embedded</DebugType>
   </PropertyGroup>
 
+  <!-- Sample apps under samples/ have their own .csproj files; exclude
+       their sources so the SDK's default glob doesn't try to compile
+       them as part of the library. -->
+  <ItemGroup>
+    <Compile Remove="samples/**/*.cs" />
+    <None Remove="samples/**/*" />
+  </ItemGroup>
+
 </Project>
